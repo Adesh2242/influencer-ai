@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+
+  /* Brand: deep violet. */
+  --color-brand-50: #f3f1ff;
+  --color-brand-100: #e9e5ff;
+  --color-brand-200: #d5ceff;
+  --color-brand-300: #b5a6ff;
+  --color-brand-400: #9175ff;
+  --color-brand-500: #7346fb;
+  --color-brand-600: #6227f1;
+  --color-brand-700: #5219d4;
+  --color-brand-800: #4416ad;
+  --color-brand-900: #39158b;
+  --color-brand-950: #220a5e;
+
+  /* Accent: marigold saffron. */
+  --color-saffron-50: #fff8eb;
+  --color-saffron-100: #ffeac6;
+  --color-saffron-200: #ffd388;
+  --color-saffron-300: #ffb84a;
+  --color-saffron-400: #ff9f20;
+  --color-saffron-500: #f97c07;
+  --color-saffron-600: #dd5702;
+  --color-saffron-700: #b73906;
+  --color-saffron-800: #942c0c;
+  --color-saffron-900: #7a250d;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-lift: 0 18px 40px -20px rgb(57 21 139 / 0.35);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-slate-50 text-slate-900 antialiased;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-950;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* Centered page column with a 16px gutter on phones. */
+@utility container-page {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}

@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Netlify
+.netlify/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs & OS
+npm-debug.log*
+*.log
+.DS_Store
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
