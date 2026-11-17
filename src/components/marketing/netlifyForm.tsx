@@ -2,7 +2,7 @@ import { CircleAlert, CircleCheck } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/misc";
-import { HONEYPOT_FIELD, submitNetlifyForm } from "@/config/forms";
+import { HONEYPOT_FIELD, submitForm } from "@/config/forms";
 import { cn } from "@/lib/utils";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
@@ -41,7 +41,7 @@ export function useNetlifyForm<F extends string>(form: NetlifyFormConfig<F>) {
       inFlight.current = true;
       setStatus("submitting");
       try {
-        await submitNetlifyForm(form.name, data);
+        await submitForm(form.name, data);
         setStatus("success");
       } catch {
         setStatus("error");

@@ -19,5 +19,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "netlify", "scripts", "vite.config.ts"]
+  "include": ["src", "netlify", "scripts", "server.ts", "vite.config.ts"]
 }
