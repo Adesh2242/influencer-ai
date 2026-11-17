@@ -1,10 +1,12 @@
-// Fetches real Maharashtra creators from YouTube and writes them as a dataset the app can load.
+// Fetches real Maharashtra creators from YouTube and stores them.
 //
-//   npm run ingest:mh -- --out src/data/maharashtra-creators.json --max 100
+//   npm run ingest:mh                      # into Postgres when DATABASE_URL is set
+//   npm run ingest:mh -- --out data.json   # into a file instead
 //
-// Needs a YouTube Data API key. In a cloud session the key is injected by the HTTPS proxy as a
-// network secret on youtube.googleapis.com; elsewhere set YOUTUBE_API_KEY.
+// This is what the scheduled ingestion service runs on Railway. It needs a YouTube Data API key in
+// YOUTUBE_API_KEY, and writes to Postgres through DATABASE_URL when one is configured.
 import { writeFile } from "node:fs/promises";
+import { closePool, migrate, recordIngestRun, upsertCreators } from "../src/server/db";
 import { ingestMaharashtra } from "../src/lib/ingest/pipeline";
 import { MissingKeyError, QuotaExceededError, QuotaMeter } from "../src/lib/ingest/youtube";
 import type { LocationConfidence } from "../src/lib/ingest/location";
@@ -15,13 +17,15 @@ function arg(name: string, fallback?: string): string | undefined {
 }
 
 async function main(): Promise<void> {
-  const out = arg("out", "src/data/maharashtra-creators.json") as string;
-  const maxCreators = Number(arg("max", "100"));
-  const minSubscribers = Number(arg("min-subs", "1000"));
+  const out = arg("out");
+  const maxCreators = Number(arg("max", "150"));
+  const minSubscribers = Number(arg("min-subs", "5000"));
   const minConfidence = arg("confidence", "likely") as LocationConfidence;
-  const quotaLimit = Number(arg("quota", "10000"));
+  const quotaLimit = Number(arg("quota", "9000"));
+  const startedAt = new Date().toISOString();
 
-  console.log(`Ingesting Maharashtra creators (max ${maxCreators}, quota ${quotaLimit})…`);
+  const target = out ? out : process.env.DATABASE_URL ? "Postgres" : "(nowhere — set DATABASE_URL or pass --out)";
+  console.log(`Ingesting Maharashtra creators (max ${maxCreators}, quota ${quotaLimit}) into ${target}…`);
 
   const report = await ingestMaharashtra({
     maxCreators,
@@ -30,25 +34,11 @@ async function main(): Promise<void> {
     quota: new QuotaMeter(quotaLimit),
   });
 
-  const payload = {
-    generatedAt: new Date().toISOString(),
-    scope: "Maharashtra",
-    source: "YouTube Data API v3",
-    note:
-      "Follower, view, engagement and cadence figures are from YouTube. Audience demographics, " +
-      "authenticity, rate cards and collaborations are estimates, not observations.",
-    creators: report.creators,
-  };
-  await writeFile(out, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-
-  console.log(`\n  ${report.creators.length} creators written to ${out}`);
+  console.log(`\n  ${report.creators.length} creators found`);
   console.log(`  ${report.queriesRun} searches, ${report.channelsInspected} channels inspected`);
   console.log(`  quota spent: ${report.quotaSpent}${report.quotaExhausted ? " (exhausted)" : ""}`);
-  if (Object.keys(report.rejections).length > 0) {
-    console.log("  dropped:");
-    for (const [reason, count] of Object.entries(report.rejections)) {
-      console.log(`    ${count.toString().padStart(4)}  ${reason}`);
-    }
+  for (const [reason, count] of Object.entries(report.rejections)) {
+    console.log(`    dropped ${count.toString().padStart(4)}  ${reason}`);
   }
 
   const byConfidence = report.creators.reduce<Record<string, number>>((acc, c) => {
@@ -56,13 +46,47 @@ async function main(): Promise<void> {
     return acc;
   }, {});
   console.log(`  location confidence: ${JSON.stringify(byConfidence)}`);
+
+  if (out) {
+    const payload = {
+      generatedAt: startedAt,
+      scope: "Maharashtra",
+      source: "YouTube Data API v3",
+      note:
+        "Follower, view, engagement and cadence figures are from YouTube. Audience demographics, " +
+        "authenticity, rate cards and collaborations are estimates, not observations.",
+      creators: report.creators,
+    };
+    await writeFile(out, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    console.log(`\n  written to ${out}`);
+    return;
+  }
+
+  if (!process.env.DATABASE_URL) {
+    console.error("\nNothing was stored: set DATABASE_URL, or pass --out to write a file.\n");
+    process.exitCode = 2;
+    return;
+  }
+
+  await migrate();
+  const stored = await upsertCreators(report.creators);
+  await recordIngestRun(startedAt, stored, report.quotaSpent, {
+    queriesRun: report.queriesRun,
+    channelsInspected: report.channelsInspected,
+    rejections: report.rejections,
+    byConfidence,
+  });
+  console.log(`\n  ${stored} creators written to Postgres`);
 }
 
-main().catch((error: unknown) => {
-  if (error instanceof MissingKeyError || error instanceof QuotaExceededError) {
-    console.error(`\n${error.message}\n`);
-    process.exit(2);
-  }
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .catch((error: unknown) => {
+    if (error instanceof MissingKeyError || error instanceof QuotaExceededError) {
+      console.error(`\n${error.message}\n`);
+      process.exitCode = 2;
+      return;
+    }
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => closePool());

@@ -9,6 +9,7 @@ import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { handleParseBrief } from "./netlify/lib/parse-brief-handler";
+import { countCreators, hasDatabase, listCreators, migrate } from "./src/server/db";
 import { handleFormSubmission } from "./src/server/forms";
 
 const DIST = resolve(process.env.DIST_DIR ?? "dist");
@@ -124,6 +125,29 @@ export const server = createServer((req, res) => {
         return;
       }
 
+      // The ingested Maharashtra creators. The client loads these in place of the demo dataset;
+      // an empty list is a valid answer and means ingestion has not run yet.
+      if (url.pathname === "/api/creators") {
+        if (!hasDatabase()) {
+          res.writeHead(503, { ...SECURITY_HEADERS, "Content-Type": "application/json", "Cache-Control": NO_STORE });
+          res.end(JSON.stringify({ error: "no_database", message: "No creator database is configured." }));
+          return;
+        }
+        const records = await listCreators({
+          minConfidence: (url.searchParams.get("confidence") as "strong" | "likely" | "weak" | null) ?? "likely",
+          cityId: url.searchParams.get("city") ?? undefined,
+          limit: Number(url.searchParams.get("limit") ?? 500),
+        });
+        res.writeHead(200, {
+          ...SECURITY_HEADERS,
+          "Content-Type": "application/json; charset=utf-8",
+          // Short cache: the data only changes when the ingestion job runs.
+          "Cache-Control": "public, max-age=300",
+        });
+        res.end(JSON.stringify({ creators: records }));
+        return;
+      }
+
       if (url.pathname === "/api/parse-brief") {
         const body = await readBody(req);
         await send(res, await handleParseBrief(toRequest(req, url, body), { apiKey: process.env.ANTHROPIC_API_KEY }));
@@ -171,5 +195,14 @@ export const server = createServer((req, res) => {
 
 // Started directly rather than imported by a test.
 if (process.env.NODE_ENV !== "test") {
-  server.listen(PORT, HOST, () => console.log(`influencer-ai listening on ${HOST}:${PORT}`));
+  // Create tables before accepting traffic, but never refuse to start over a database problem: the
+  // marketing pages and the brief parser work without one, and a half-up site beats a dead one.
+  const ready = hasDatabase()
+    ? migrate()
+        .then(countCreators)
+        .then((count) => console.log(`database ready, ${count} creators stored`))
+        .catch((error: unknown) => console.error("database setup failed, continuing without it:", error))
+    : Promise.resolve(console.log("no DATABASE_URL set, running without a creator database"));
+
+  void ready.then(() => server.listen(PORT, HOST, () => console.log(`influencer-ai listening on ${HOST}:${PORT}`)));
 }

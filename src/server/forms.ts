@@ -5,9 +5,11 @@
 // return 200, so the form would show its success panel and the sign-up would vanish. This endpoint
 // exists so that can never happen: a submission is either delivered or it fails loudly.
 //
-// Delivery is by email through Resend. Set RESEND_API_KEY and FORMS_TO_EMAIL to turn it on. With
-// neither set the endpoint reports itself unconfigured instead of pretending to have worked.
+// Submissions are stored in Postgres when DATABASE_URL is set, and emailed through Resend when it
+// is not but RESEND_API_KEY and FORMS_TO_EMAIL are. With neither, the endpoint reports itself
+// unconfigured instead of pretending to have worked.
 import { BRAND_FORM, CREATOR_FORM, HONEYPOT_FIELD } from "../config/forms";
+import { hasDatabase, insertFormSubmission } from "./db";
 
 const FORMS = [BRAND_FORM, CREATOR_FORM];
 const MAX_FIELD_LENGTH = 2000;
@@ -84,8 +86,15 @@ export async function handleFormSubmission(req: Request, formName: string, deps:
   const to = deps.to ?? process.env.FORMS_TO_EMAIL;
   const from = deps.from ?? process.env.FORMS_FROM_EMAIL ?? "InfluencerAI <onboarding@resend.dev>";
 
+  // Postgres first: a stored row is queryable and survives a mail outage. Email is the fallback for
+  // a deployment without a database, and only then does the endpoint report itself unconfigured.
   const deliver =
-    deps.deliver ?? (apiKey && to ? (payload: DeliveryPayload) => deliverByEmail(payload, { apiKey, to, from }) : undefined);
+    deps.deliver ??
+    (hasDatabase()
+      ? (payload: DeliveryPayload) => insertFormSubmission(payload.formName, payload.fields)
+      : apiKey && to
+        ? (payload: DeliveryPayload) => deliverByEmail(payload, { apiKey, to, from })
+        : undefined);
 
   if (!deliver) {
     // Nowhere to put it. Say so rather than dropping it: the UI shows its error state and the
