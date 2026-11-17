@@ -1,6 +1,6 @@
 import { Info } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
-import { creators } from "@/data/creators";
+import { useCreators } from "@/data/creatorStore";
 import { LANGUAGE_CODES, LANGUAGES, NICHES } from "@/data/taxonomy";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,8 @@ function CoverageStat({ label, value, hint }: { label: string; value: ReactNode;
 
 /** Live counts from the demo dataset plus the supported languages in their own scripts. */
 export function IndiaCoverage({ className }: { className?: string }) {
-  const coverage = useMemo(() => computeCoverage(creators), []);
+  const { creators } = useCreators();
+  const coverage = useMemo(() => computeCoverage(creators), [creators]);
   const hasData = coverage.creators > 0;
 
   return (
@@ -30,7 +31,7 @@ export function IndiaCoverage({ className }: { className?: string }) {
         </h3>
         {hasData ? (
           <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <CoverageStat label="Creators" value={formatNumber(coverage.creators)} hint="fictional profiles" />
+            <CoverageStat label="Creators" value={formatNumber(coverage.creators)} hint="from YouTube" />
             <CoverageStat
               label="Languages"
               value={formatNumber(coverage.languages)}

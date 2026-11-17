@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creators } from "@/data/creators";
+import { creators } from "@/test/creatorFixtures";
 import { DEFAULT_BRIEF, mergeBrief } from "@/lib/brief/defaults";
 import { matchCreators } from "@/lib/matching/engine";
 import { estimateStats, exclusionKind, groupExclusions, isBlankBrief, sortResults, summarizeMatches } from "./results";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creators } from "@/data/creators";
+import { creators } from "@/test/creatorFixtures";
 import { getCity } from "@/data/taxonomy";
 import { activeFilterCount, EMPTY_QUERY, filterCreators, parseDiscoverQuery, sortCreators, toSearchParams } from "./query";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FICTIONAL_BRANDS, creators } from "./creators";
+import { FICTIONAL_BRANDS, creators } from "../test/creatorFixtures";
 import { SAMPLE_BRIEFS } from "./sampleBriefs";
 import { CITY_BY_ID } from "./taxonomy";
 import { matchCreators } from "../lib/matching/engine";

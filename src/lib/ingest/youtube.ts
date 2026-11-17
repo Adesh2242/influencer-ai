@@ -28,6 +28,8 @@ export interface YouTubeChannel {
   /** Wikipedia topic URLs from topicDetails, e.g. ".../wiki/Food". Coarse but free. */
   topicCategories: string[];
   defaultLanguage?: string;
+  /** Channel avatar, largest available. Comes free with part=snippet. */
+  avatarUrl?: string;
 }
 
 export interface YouTubeVideo {
@@ -78,6 +80,15 @@ export class QuotaMeter {
   charge(cost: number): void {
     this.used += cost;
   }
+}
+
+/** YouTube returns default/medium/high; take the biggest so the UI can scale down. */
+function pickAvatar(thumbnails?: Record<string, { url?: string; width?: number }>): string | undefined {
+  if (!thumbnails) return undefined;
+  const best = Object.values(thumbnails)
+    .filter((t): t is { url: string; width?: number } => Boolean(t?.url))
+    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0];
+  return best?.url;
 }
 
 function toInt(value: unknown): number {
@@ -161,7 +172,15 @@ export async function searchChannels(
 
 interface RawChannel {
   id: string;
-  snippet?: { title?: string; description?: string; customUrl?: string; country?: string; publishedAt?: string; defaultLanguage?: string };
+  snippet?: {
+    title?: string;
+    description?: string;
+    customUrl?: string;
+    country?: string;
+    publishedAt?: string;
+    defaultLanguage?: string;
+    thumbnails?: Record<string, { url?: string; width?: number; height?: number }>;
+  };
   statistics?: { subscriberCount?: string; hiddenSubscriberCount?: boolean; videoCount?: string; viewCount?: string };
   brandingSettings?: { channel?: { keywords?: string } };
   contentDetails?: { relatedPlaylists?: { uploads?: string } };
@@ -193,6 +212,7 @@ export async function getChannels(ids: string[]): Promise<YouTubeChannel[]> {
         uploadsPlaylistId: raw.contentDetails?.relatedPlaylists?.uploads,
         topicCategories: raw.topicDetails?.topicCategories ?? [],
         defaultLanguage: raw.snippet?.defaultLanguage,
+        avatarUrl: pickAvatar(raw.snippet?.thumbnails),
       });
     }
   }

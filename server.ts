@@ -9,7 +9,16 @@ import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { handleParseBrief } from "./netlify/lib/parse-brief-handler";
-import { countCreators, hasDatabase, listCreators, migrate } from "./src/server/db";
+import { findLookalikes, growthFrom, topicCoOccurrence } from "./src/lib/analytics";
+import {
+  countCreators,
+  getCreator,
+  hasDatabase,
+  listCreators,
+  listSnapshots,
+  listTopicSources,
+  migrate,
+} from "./src/server/db";
 import { handleFormSubmission } from "./src/server/forms";
 
 const DIST = resolve(process.env.DIST_DIR ?? "dist");
@@ -32,6 +41,16 @@ const CONTENT_TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
   ".webmanifest": "application/manifest+json",
 };
+
+/** JSON reply with the standard headers; `return void sendJson(...)` keeps the routes to one line. */
+function sendJson(res: ServerResponse, status: number, body: unknown, cacheControl = "no-store"): void {
+  res.writeHead(status, {
+    ...SECURITY_HEADERS,
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": cacheControl,
+  });
+  res.end(JSON.stringify(body));
+}
 
 /** Applied to every response, matching the [[headers]] block netlify.toml used to serve. */
 const SECURITY_HEADERS: Record<string, string> = {
@@ -147,6 +166,39 @@ export const server = createServer((req, res) => {
         });
         res.end(JSON.stringify({ creators: records }));
         return;
+      }
+
+      // Creators most like this one, by the hashtags they put on their own videos.
+      const lookalikeMatch = /^\/api\/creators\/([^/]+)\/lookalikes$/.exec(url.pathname);
+      if (lookalikeMatch) {
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+        const id = decodeURIComponent(lookalikeMatch[1]);
+        const target = await getCreator(id);
+        if (!target) return void sendJson(res, 404, { error: "not_found" });
+        const pool = await listCreators({ minConfidence: "weak", limit: 2000 });
+        const matches = findLookalikes(
+          target.creator,
+          pool.map((record) => record.creator),
+          Number(url.searchParams.get("limit") ?? 10),
+        );
+        return void sendJson(res, 200, { creator: target.creator.id, lookalikes: matches }, "public, max-age=300");
+      }
+
+      // Follower velocity and engagement drift from the stored run history.
+      const trendMatch = /^\/api\/creators\/([^/]+)\/trend$/.exec(url.pathname);
+      if (trendMatch) {
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+        const id = decodeURIComponent(trendMatch[1]);
+        const snapshots = await listSnapshots(id);
+        return void sendJson(res, 200, { creator: id, snapshots, trend: growthFrom(snapshots) }, "public, max-age=300");
+      }
+
+      // Hashtags that travel together across the dataset.
+      if (url.pathname === "/api/topics/co-occurrence") {
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+        const sources = await listTopicSources();
+        const pairs = topicCoOccurrence(sources, Number(url.searchParams.get("limit") ?? 40));
+        return void sendJson(res, 200, { creators: sources.length, pairs }, "public, max-age=600");
       }
 
       if (url.pathname === "/api/parse-brief") {

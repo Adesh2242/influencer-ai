@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CREATOR_BY_ID, DATASET_SEED, DATASET_SIZE, FICTIONAL_BRANDS, creators, generateCreators, getCreatorById } from "./creators";
-import { FAMOUS_NAMES, nameKey } from "./generator/names";
+import { CREATOR_BY_ID, DATASET_SEED, DATASET_SIZE, FICTIONAL_BRANDS, creators, generateCreators, getCreatorById } from "./creatorFixtures";
+import { FAMOUS_NAMES, nameKey } from "../data/generator/names";
 import {
   AGE_BANDS,
   CITY_BY_ID,
@@ -12,7 +12,7 @@ import {
   PLATFORM_LIST,
   REGION_LIST,
   tierForFollowers,
-} from "./taxonomy";
+} from "../data/taxonomy";
 import type { CreatorTier } from "../types";
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creators } from "../../data/creators";
+import { creators } from "../../test/creatorFixtures";
 import { SAMPLE_BRIEFS } from "../../data/sampleBriefs";
 import { matchCreators } from "./engine";
 import { planCampaign, summarizeSelection } from "./optimize";

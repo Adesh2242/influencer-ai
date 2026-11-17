@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { LoaderCircle, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -98,18 +99,41 @@ export interface AvatarProps {
   name: string;
   /** 0-359. */
   hue: number;
+  /** Real profile picture when the creator was ingested from a platform. */
+  src?: string;
   size?: keyof typeof avatarSizes;
   className?: string;
 }
 
-/** Initials on a gradient: demo creators have no photos. */
-export function Avatar({ name, hue, size = "md", className }: AvatarProps) {
+/**
+ * The creator's profile picture, falling back to initials on a gradient. The picture is hosted by
+ * the platform and can 404 or be blocked, so a failure swaps back to initials rather than leaving
+ * a broken image.
+ */
+export function Avatar({ name, hue, src, size = "md", className }: AvatarProps) {
+  const [failed, setFailed] = useState(false);
+
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        // Platform avatars are square; object-cover keeps a non-square one from stretching.
+        className={cn("shrink-0 rounded-full bg-slate-100 object-cover", avatarSizes[size], className)}
+      />
+    );
+  }
 
   return (
     <div

@@ -136,8 +136,10 @@ export interface Creator {
   verified: boolean;
   gstRegistered: boolean;
   joinedMonthsAgo: number;
-  /** 0-359, used for the generated avatar. */
+  /** 0-359, used for the generated avatar when no picture is available. */
   avatarHue: number;
+  /** Real profile picture when the creator was ingested from a platform. */
+  avatarUrl?: string;
 }
 
 /**

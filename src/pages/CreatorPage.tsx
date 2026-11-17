@@ -12,14 +12,27 @@ import { TrustSection } from "@/components/profile/TrustSection";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/misc";
 import { SITE } from "@/config/site";
-import { creators, getCreatorById } from "@/data/creators";
+import { DatasetState } from "@/components/creators/DatasetState";
+import { useCreators } from "@/data/creatorStore";
 import { scoreCreator } from "@/lib/matching/engine";
 import { useBrief } from "@/state/BriefContext";
 import type { Creator } from "@/types";
 
 export default function CreatorPage() {
   const { id = "" } = useParams();
+  const { creators, getCreatorById, status, error, reload } = useCreators();
   const creator = getCreatorById(id);
+
+  // A profile cannot be "not found" until the dataset has actually loaded.
+  if (status !== "ready") {
+    return (
+      <div className="container-page py-12">
+        <title>{"Creator · " + SITE.name}</title>
+        <h1 className="sr-only">Creator profile</h1>
+        <DatasetState status={status} error={error} onRetry={reload} subject="this profile" />
+      </div>
+    );
+  }
 
   if (!creator) {
     return (
@@ -29,7 +42,7 @@ export default function CreatorPage() {
         <EmptyState
           icon={UserX}
           title="We couldn't find that creator"
-          description="The link may be out of date, or the profile is no longer in the demo dataset."
+          description="The link may be out of date, or the creator is no longer in the dataset."
           action={<ButtonLink to="/discover">Browse all creators</ButtonLink>}
         />
       </div>
@@ -37,16 +50,16 @@ export default function CreatorPage() {
   }
 
   // Keyed by id so per-profile state (outreach toggles, copy status) resets between profiles.
-  return <CreatorProfile key={creator.id} creator={creator} />;
+  return <CreatorProfile key={creator.id} creator={creator} pool={creators} />;
 }
 
-function CreatorProfile({ creator }: { creator: Creator }) {
+function CreatorProfile({ creator, pool }: { creator: Creator; pool: Creator[] }) {
   const { brief } = useBrief();
   const outreachHeading = useRef<HTMLHeadingElement>(null);
 
   const estimate = useMemo(() => scoreCreator(brief, creator), [brief, creator]);
   const targeted = hasTargeting(brief);
-  const similar = useMemo(() => similarCreators(creator, creators, 4), [creator]);
+  const similar = useMemo(() => similarCreators(creator, pool, 4), [creator, pool]);
 
   function scrollToOutreach() {
     const heading = outreachHeading.current;

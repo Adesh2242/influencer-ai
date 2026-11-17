@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creators } from "../../data/creators";
+import { creators } from "../../test/creatorFixtures";
 import { DEFAULT_BRIEF, mergeBrief } from "../brief/defaults";
 import { DEFAULT_WEIGHTS, SCORE_LABELS, matchCreators, scoreCreator } from "./engine";
 import type { CampaignBrief, MatchResult, ScoreKey } from "../../types";

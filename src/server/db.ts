@@ -5,6 +5,7 @@
 // tables would have to be migrated every time the ingestion learns something new; the lifted
 // columns carry the indexes, so nothing is lost by keeping the body opaque.
 import { Pool, type PoolClient } from "pg";
+import type { Snapshot } from "../lib/analytics";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
 
 let pool: Pool | undefined;
@@ -69,6 +70,19 @@ create index if not exists creators_confidence_idx on creators (location_confide
 create index if not exists creators_hashtags_idx   on creators using gin (hashtags);
 create index if not exists creators_video_tags_idx on creators using gin (video_tags);
 create index if not exists creators_niches_idx     on creators using gin (niches);
+
+-- One row per creator per ingest run. The creators table only ever holds the latest figures, so
+-- without this there is no way to say whether a channel is growing or coasting.
+create table if not exists creator_snapshots (
+  id              bigserial primary key,
+  creator_id      text         not null,
+  captured_at     timestamptz  not null,
+  followers       bigint       not null,
+  avg_views       bigint       not null,
+  engagement_rate numeric(7,2) not null,
+  unique (creator_id, captured_at)
+);
+create index if not exists creator_snapshots_creator_idx on creator_snapshots (creator_id, captured_at desc);
 
 create table if not exists form_submissions (
   id          bigserial primary key,
@@ -147,6 +161,12 @@ export async function upsertCreators(records: SourcedCreator[]): Promise<number>
         source.fetchedAt,
         JSON.stringify(record),
       ]);
+      // Append-only history. Re-running on the same day is a no-op rather than a duplicate.
+      await client.query(
+        `insert into creator_snapshots (creator_id, captured_at, followers, avg_views, engagement_rate)
+         values ($1,$2,$3,$4,$5) on conflict (creator_id, captured_at) do nothing`,
+        [creator.id, source.fetchedAt, creator.platforms[0]?.followers ?? 0, metrics.avgViews, metrics.engagementRate],
+      );
     }
     await client.query("commit");
     return records.length;
@@ -190,6 +210,45 @@ export async function listCreators(query: CreatorQuery = {}): Promise<SourcedCre
 
   const { rows } = await getPool().query<{ record: SourcedCreator }>(sql, params);
   return rows.map((row) => row.record);
+}
+
+/** Snapshot history for one creator, oldest first, for the growth trend. */
+export async function listSnapshots(creatorId: string, limit = 50): Promise<Snapshot[]> {
+  const { rows } = await getPool().query<{
+    captured_at: Date;
+    followers: string;
+    avg_views: string;
+    engagement_rate: string;
+  }>(
+    `select captured_at, followers, avg_views, engagement_rate
+     from creator_snapshots where creator_id = $1 order by captured_at desc limit $2`,
+    [creatorId, Math.min(limit, 200)],
+  );
+  return rows
+    .map((row) => ({
+      capturedAt: new Date(row.captured_at).toISOString(),
+      followers: Number(row.followers),
+      avgViews: Number(row.avg_views),
+      engagementRate: Number(row.engagement_rate),
+    }))
+    .reverse();
+}
+
+/** Every creator's topics, for co-occurrence and lookalikes, without hauling full records back. */
+export async function listTopicSources(): Promise<{ id: string; name: string; topics: string[] }[]> {
+  const { rows } = await getPool().query<{ id: string; name: string; hashtags: string[]; video_tags: string[] }>(
+    "select id, name, hashtags, video_tags from creators",
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    topics: [...new Set([...(row.hashtags ?? []), ...(row.video_tags ?? [])])],
+  }));
+}
+
+export async function getCreator(id: string): Promise<SourcedCreator | undefined> {
+  const { rows } = await getPool().query<{ record: SourcedCreator }>("select record from creators where id = $1", [id]);
+  return rows[0]?.record;
 }
 
 export async function countCreators(): Promise<number> {

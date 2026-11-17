@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Label, Select } from "@/components/ui/form";
 import { EmptyState, Stat } from "@/components/ui/misc";
-import { creators } from "@/data/creators";
+import { DatasetState } from "@/components/creators/DatasetState";
+import { useCreators } from "@/data/creatorStore";
 import { formatCount, formatINRCompact } from "@/lib/format";
 import { matchCreators } from "@/lib/matching/engine";
 import { planCampaign } from "@/lib/matching/optimize";
@@ -65,7 +66,8 @@ export function ResultsPanel() {
   const { brief, updateBrief } = useBrief();
   const deferredBrief = useDeferredValue(brief);
   const stale = deferredBrief !== brief;
-  const { results, excluded } = useMemo(() => matchCreators(deferredBrief, creators), [deferredBrief]);
+  const { creators, status, error, reload } = useCreators();
+  const { results, excluded } = useMemo(() => matchCreators(deferredBrief, creators), [deferredBrief, creators]);
   const summary = useMemo(() => summarizeMatches(results, excluded, deferredBrief), [results, excluded, deferredBrief]);
 
   const [sort, setSort] = useState<MatchSort>("score");
@@ -86,6 +88,19 @@ export function ResultsPanel() {
   const sortId = useId();
   const excludedId = useId();
   const blank = isBlankBrief(deferredBrief);
+
+  // Nothing can be matched until the creators are loaded; say which it is rather than showing
+  // an empty ranking that reads like a genuine "no creator fits this brief".
+  if (status !== "ready") {
+    return (
+      <section aria-labelledby="results-heading" className="flex min-w-0 flex-col gap-4">
+        <h2 id="results-heading" className="sr-only">
+          Matching creators
+        </h2>
+        <DatasetState status={status} error={error} onRetry={reload} />
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="results-heading" className="flex min-w-0 flex-col gap-4">

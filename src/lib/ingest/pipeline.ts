@@ -47,7 +47,28 @@ const CONFIDENCE_RANK: Record<LocationConfidence, number> = { none: 0, weak: 1, 
  * brand shortlists. Pairing a niche with a place or with Marathi words surfaces individuals.
  */
 export const SEED_TERMS = {
-  places: ["Pune", "Mumbai", "Nagpur", "Nashik", "Kolhapur", "Thane", "Aurangabad", "Solapur", "Maharashtra"],
+  places: [
+    "Pune",
+    "Mumbai",
+    "Nagpur",
+    "Nashik",
+    "Kolhapur",
+    "Thane",
+    "Aurangabad",
+    "Solapur",
+    "Amravati",
+    "Navi Mumbai",
+    "Jalgaon",
+    "Sangli",
+    "Satara",
+    "Latur",
+    "Akola",
+    "Chandrapur",
+    "Ahmednagar",
+    "Ratnagiri",
+    "Nanded",
+    "Maharashtra",
+  ],
   niches: [
     "food vlog",
     "recipe",
@@ -61,18 +82,57 @@ export const SEED_TERMS = {
     "finance investing",
     "MPSC study",
     "motovlog",
+    "daily vlog",
+    "street food",
+    "home decor",
+    "parenting",
+    "devotional",
+    "cricket",
+    "gaming",
+    "skincare",
+    "wedding",
+    "real estate",
+    "car review",
+    "small business",
   ],
-  marathi: ["मराठी रेसिपी", "मराठी व्लॉग", "मराठी कॉमेडी", "मराठी शेती", "मराठी फॅशन"],
+  marathi: [
+    "मराठी रेसिपी",
+    "मराठी व्लॉग",
+    "मराठी कॉमेडी",
+    "मराठी शेती",
+    "मराठी फॅशन",
+    "मराठी प्रवास",
+    "मराठी गाणी",
+    "मराठी बातम्या",
+    "मराठी शिक्षण",
+    "मराठी आरोग्य",
+  ],
 };
 
-/** Builds the query list, cheapest-yield first, capped so a run stays inside its quota. */
-export function buildSeedQueries(limit = 40): string[] {
+/**
+ * Every place-and-niche pairing plus the Marathi terms: far more queries than one day's quota can
+ * run. Deliberately so — `offset` rotates which slice a run takes, so consecutive runs explore new
+ * ground instead of rediscovering the same channels. Without that, a daily job finds the same few
+ * hundred creators forever.
+ */
+export function allSeedQueries(): string[] {
   const queries: string[] = [];
   for (const niche of SEED_TERMS.niches) {
-    for (const place of SEED_TERMS.places.slice(0, 4)) queries.push(`${place} ${niche}`);
+    for (const place of SEED_TERMS.places) queries.push(`${place} ${niche}`);
   }
   queries.push(...SEED_TERMS.marathi);
-  return queries.slice(0, limit);
+  for (const place of SEED_TERMS.places) queries.push(`${place} मराठी`);
+  return queries;
+}
+
+/** The slice of the query list this run should use, wrapping around at the end. */
+export function buildSeedQueries(limit = 40, offset = 0): string[] {
+  const all = allSeedQueries();
+  if (limit >= all.length) return all;
+  const start = ((offset % all.length) + all.length) % all.length;
+  const slice = all.slice(start, start + limit);
+  // Wrap rather than return a short list at the end of the cycle.
+  return slice.length < limit ? [...slice, ...all.slice(0, limit - slice.length)] : slice;
 }
 
 function languagesFor(verdict: LocationVerdict, channel: YouTubeChannel): LanguageCode[] {
@@ -96,8 +156,12 @@ function seedFrom(id: string): number {
 
 export interface IngestOptions {
   queries?: string[];
+  /** Rotates which seed queries this run uses; pass the run number or day. */
+  seedOffset?: number;
   /** Stop after this many accepted creators. */
   maxCreators?: number;
+  /** How many searches to run. Each costs 100 quota units. */
+  maxQueries?: number;
   /** Channels smaller than this are skipped: too little signal to score. */
   minSubscribers?: number;
   /** How sure we must be that the creator is in Maharashtra. */
@@ -186,6 +250,7 @@ export function toCreator(
     gstRegistered: false,
     joinedMonthsAgo: monthsOld,
     avatarHue: seedFrom(channel.id) % 360,
+    avatarUrl: channel.avatarUrl,
   };
 
   return {
@@ -205,7 +270,8 @@ export function toCreator(
 
 export async function ingestMaharashtra(options: IngestOptions = {}): Promise<IngestReport> {
   const {
-    queries = buildSeedQueries(),
+    seedOffset = 0,
+    queries = buildSeedQueries(options.maxQueries ?? 40, seedOffset),
     maxCreators = 200,
     minSubscribers = 1_000,
     minConfidence = "likely",

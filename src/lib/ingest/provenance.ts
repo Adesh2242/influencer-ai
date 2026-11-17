@@ -37,6 +37,7 @@ export const YOUTUBE_PROVENANCE: ProvenanceMap = {
   name: "measured",
   handle: "measured",
   bio: "measured",
+  avatarUrl: "measured",
   "platforms.followers": "measured",
   "platforms.avgViews": "derived",
   "platforms.engagementRate": "derived",

@@ -67,7 +67,7 @@ export function CreatorIdentity({ creator, size = "md", linkToProfile = true, na
 
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
-      <Avatar name={creator.name} hue={creator.avatarHue} size={size} />
+      <Avatar name={creator.name} hue={creator.avatarHue} src={creator.avatarUrl} size={size} />
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1">
           {linkToProfile ? (

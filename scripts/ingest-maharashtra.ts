@@ -18,8 +18,12 @@ function arg(name: string, fallback?: string): string | undefined {
 
 async function main(): Promise<void> {
   const out = arg("out");
-  const maxCreators = Number(arg("max", "150"));
-  const minSubscribers = Number(arg("min-subs", "5000"));
+  const maxCreators = Number(arg("max", "400"));
+  const minSubscribers = Number(arg("min-subs", "1000"));
+  const maxQueries = Number(arg("queries", "40"));
+  // Rotate the seed queries by the day, so a daily job explores new ground each run instead of
+  // rediscovering the same channels. --offset overrides it for a manual backfill.
+  const seedOffset = Number(arg("offset", String(Math.floor(Date.now() / 86_400_000) * maxQueries)));
   const minConfidence = arg("confidence", "likely") as LocationConfidence;
   const quotaLimit = Number(arg("quota", "9000"));
   const startedAt = new Date().toISOString();
@@ -29,8 +33,10 @@ async function main(): Promise<void> {
 
   const report = await ingestMaharashtra({
     maxCreators,
+    maxQueries,
     minSubscribers,
     minConfidence,
+    seedOffset,
     quota: new QuotaMeter(quotaLimit),
   });
 

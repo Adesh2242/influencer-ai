@@ -10,7 +10,7 @@ import { ShortlistTable } from "@/components/shortlist/ShortlistTable";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/misc";
 import { SITE } from "@/config/site";
-import { getCreatorById } from "@/data/creators";
+import { useCreators } from "@/data/creatorStore";
 import { scoreCreator } from "@/lib/matching/engine";
 import { planCampaign, summarizeSelection } from "@/lib/matching/optimize";
 import { useBrief } from "@/state/BriefContext";
@@ -24,6 +24,7 @@ export default function ShortlistPage() {
   const optimiseButton = useRef<HTMLButtonElement>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
 
+  const { getCreatorById } = useCreators();
   const results = useMemo(
     () =>
       shortlist.ids

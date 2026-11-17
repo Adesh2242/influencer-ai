@@ -20,7 +20,8 @@ import { Card } from "@/components/ui/Card";
 import { Input, Label, Select } from "@/components/ui/form";
 import { EmptyState } from "@/components/ui/misc";
 import { SITE } from "@/config/site";
-import { creators } from "@/data/creators";
+import { DatasetState } from "@/components/creators/DatasetState";
+import { useCreators } from "@/data/creatorStore";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 24;
@@ -29,7 +30,11 @@ export default function DiscoverPage() {
   const [params, setParams] = useSearchParams();
   const query = useMemo(() => parseDiscoverQuery(params), [params]);
   const deferredQuery = useDeferredValue(query);
-  const list = useMemo(() => sortCreators(filterCreators(creators, deferredQuery), deferredQuery.sort), [deferredQuery]);
+  const { creators, status, error, reload } = useCreators();
+  const list = useMemo(
+    () => sortCreators(filterCreators(creators, deferredQuery), deferredQuery.sort),
+    [creators, deferredQuery],
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState({ size: PAGE_SIZE, key: list });
   const visibleCount = page.key === list ? page.size : PAGE_SIZE;
@@ -131,7 +136,9 @@ export default function DiscoverPage() {
             ) : null}
           </div>
 
-          {list.length > 0 ? (
+          {status !== "ready" ? (
+            <DatasetState status={status} error={error} onRetry={reload} />
+          ) : list.length > 0 ? (
             <>
               <ul className={cn("grid grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-3", deferredQuery !== query && "opacity-60")}>
                 {visible.map((creator) => (
