@@ -660,7 +660,7 @@ function blend(primary: number[], others: number[][], primaryWeight = 0.7): numb
   return primary.map((value, i) => primaryWeight * value + ((1 - primaryWeight) * others.reduce((sum, o) => sum + o[i], 0)) / others.length);
 }
 
-function buildAudience(
+export function buildAudience(
   rng: Rng,
   options: { niches: Niche[]; languages: LanguageCode[]; home: City; gender: Gender; primaryPlatform: Platform },
 ): AudienceProfile {
