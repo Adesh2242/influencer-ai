@@ -33,11 +33,16 @@ export interface YouTubeChannel {
 export interface YouTubeVideo {
   id: string;
   title: string;
+  description?: string;
   publishedAt: string;
   viewCount: number;
   /** Null when the channel hides likes. */
   likeCount: number | null;
   commentCount: number | null;
+  /** Creator-set video tags. Public, but only about 41% of videos carry any. */
+  tags?: string[];
+  /** YouTube's own paid-promotion disclosure. Rarely set, so absence proves nothing. */
+  hasPaidProductPlacement?: boolean;
 }
 
 export class QuotaExceededError extends Error {
@@ -206,8 +211,9 @@ export async function getRecentVideoIds(uploadsPlaylistId: string, max = 25): Pr
 
 interface RawVideo {
   id: string;
-  snippet?: { title?: string; publishedAt?: string };
+  snippet?: { title?: string; description?: string; publishedAt?: string; tags?: string[] };
   statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
+  paidProductPlacementDetails?: { hasPaidProductPlacement?: boolean };
 }
 
 /** Stats for up to 50 videos per call. likeCount is absent when a channel hides likes. */
@@ -216,7 +222,7 @@ export async function getVideos(ids: string[]): Promise<YouTubeVideo[]> {
   const out: YouTubeVideo[] = [];
   for (let i = 0; i < ids.length; i += 50) {
     const data = await call<ListResponse<RawVideo>>("videos", {
-      part: "snippet,statistics",
+      part: "snippet,statistics,paidProductPlacementDetails",
       id: ids.slice(i, i + 50).join(","),
       maxResults: "50",
     });
@@ -224,10 +230,13 @@ export async function getVideos(ids: string[]): Promise<YouTubeVideo[]> {
       out.push({
         id: raw.id,
         title: raw.snippet?.title ?? "",
+        description: raw.snippet?.description ?? "",
         publishedAt: raw.snippet?.publishedAt ?? "",
         viewCount: toInt(raw.statistics?.viewCount),
         likeCount: raw.statistics?.likeCount === undefined ? null : toInt(raw.statistics.likeCount),
         commentCount: raw.statistics?.commentCount === undefined ? null : toInt(raw.statistics.commentCount),
+        tags: raw.snippet?.tags,
+        hasPaidProductPlacement: raw.paidProductPlacementDetails?.hasPaidProductPlacement,
       });
     }
   }

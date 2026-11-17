@@ -136,6 +136,7 @@ export const server = createServer((req, res) => {
         const records = await listCreators({
           minConfidence: (url.searchParams.get("confidence") as "strong" | "likely" | "weak" | null) ?? "likely",
           cityId: url.searchParams.get("city") ?? undefined,
+          topic: url.searchParams.get("topic") ?? undefined,
           limit: Number(url.searchParams.get("limit") ?? 500),
         });
         res.writeHead(200, {

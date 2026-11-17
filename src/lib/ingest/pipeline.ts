@@ -14,6 +14,7 @@ import { Rng } from "../../data/generator/random";
 import type { Creator, LanguageCode, Platform } from "../../types";
 import { detectMaharashtra, type LocationConfidence, type LocationVerdict } from "./location";
 import { computeMetrics, median, recentVideos, type ChannelMetrics } from "./metrics";
+import { buildContentProfile, topicsFrom, type ContentProfile } from "./content";
 import { estimateAuthenticity, estimateRates } from "./estimate";
 import { classifyNiches } from "./niche";
 import { YOUTUBE_PROVENANCE, type ProvenanceMap, type SourceRecord } from "./provenance";
@@ -33,6 +34,8 @@ export interface SourcedCreator {
   provenance: ProvenanceMap;
   location: LocationVerdict;
   metrics: ChannelMetrics;
+  /** Hashtags, video tags and disclosed paid placements from the sampled videos. */
+  content: ContentProfile;
 }
 
 const CONFIDENCE_RANK: Record<LocationConfidence, number> = { none: 0, weak: 1, likely: 2, strong: 3 };
@@ -124,6 +127,7 @@ export function toCreator(
   metrics: ChannelMetrics,
   verdict: LocationVerdict,
   commentToLikeRatio: number | null,
+  content: ContentProfile = { hashtags: [], tags: [], sponsoredRatio: 0, sponsoredCount: 0, sampleSize: 0 },
 ): SourcedCreator {
   const rng = new Rng(seedFrom(channel.id));
   const handle = (channel.customUrl ?? channel.id).replace(/^@/, "");
@@ -149,7 +153,8 @@ export function toCreator(
     homeCityId: home.id,
     languages,
     niches: niches.length > 0 ? niches : ["lifestyle"],
-    topics: niches,
+    // Real hashtags and video tags, falling back to the niche labels when a channel uses neither.
+    topics: topicsFrom(content, niches),
     platforms: [
       {
         platform,
@@ -193,6 +198,7 @@ export function toCreator(
     provenance: YOUTUBE_PROVENANCE,
     location: verdict,
     metrics,
+    content,
   };
 }
 
@@ -269,7 +275,9 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
     const ratios = videos
       .filter((v) => (v.likeCount ?? 0) > 0)
       .map((v) => (v.commentCount ?? 0) / (v.likeCount as number));
-    creators.push(toCreator(channel, metrics, verdict, ratios.length > 0 ? median(ratios) : null));
+    creators.push(
+      toCreator(channel, metrics, verdict, ratios.length > 0 ? median(ratios) : null, buildContentProfile(videos)),
+    );
   }
 
   return {

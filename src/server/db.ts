@@ -48,6 +48,9 @@ create table if not exists creators (
   engagement_rate     numeric(7,2) not null,
   authenticity_score  integer      not null,
   niches              text[]       not null default '{}',
+  hashtags            text[]       not null default '{}',
+  video_tags          text[]       not null default '{}',
+  sponsored_ratio     numeric(5,3) not null default 0,
   fetched_at          timestamptz  not null,
   record              jsonb        not null,
   unique (platform, external_id)
@@ -55,6 +58,10 @@ create table if not exists creators (
 create index if not exists creators_followers_idx  on creators (followers desc);
 create index if not exists creators_city_idx       on creators (city_id);
 create index if not exists creators_confidence_idx on creators (location_confidence);
+-- GIN indexes so "which creators use #punefood" is a lookup rather than a scan.
+create index if not exists creators_hashtags_idx   on creators using gin (hashtags);
+create index if not exists creators_video_tags_idx on creators using gin (video_tags);
+create index if not exists creators_niches_idx     on creators using gin (niches);
 
 create table if not exists form_submissions (
   id          bigserial primary key,
@@ -82,8 +89,9 @@ export async function migrate(client?: PoolClient): Promise<void> {
 
 const UPSERT = `insert into creators (
   id, platform, external_id, name, handle, city_id, location_confidence, marathi_content,
-  followers, avg_views, engagement_rate, authenticity_score, niches, fetched_at, record
-) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+  followers, avg_views, engagement_rate, authenticity_score, niches, hashtags, video_tags,
+  sponsored_ratio, fetched_at, record
+) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 on conflict (id) do update set
   name = excluded.name,
   handle = excluded.handle,
@@ -95,6 +103,9 @@ on conflict (id) do update set
   engagement_rate = excluded.engagement_rate,
   authenticity_score = excluded.authenticity_score,
   niches = excluded.niches,
+  hashtags = excluded.hashtags,
+  video_tags = excluded.video_tags,
+  sponsored_ratio = excluded.sponsored_ratio,
   fetched_at = excluded.fetched_at,
   record = excluded.record`;
 
@@ -123,6 +134,9 @@ export async function upsertCreators(records: SourcedCreator[]): Promise<number>
         metrics.engagementRate,
         creator.authenticity.score,
         creator.niches,
+        record.content.hashtags,
+        record.content.tags,
+        record.content.sponsoredRatio,
         source.fetchedAt,
         JSON.stringify(record),
       ]);
@@ -141,6 +155,8 @@ export interface CreatorQuery {
   /** Drop creators we are less sure about than this. */
   minConfidence?: "strong" | "likely" | "weak";
   cityId?: string;
+  /** Only creators who use this hashtag or video tag. */
+  topic?: string;
   limit?: number;
 }
 
@@ -157,6 +173,10 @@ export async function listCreators(query: CreatorQuery = {}): Promise<SourcedCre
   if (query.cityId) {
     params.push(query.cityId);
     sql += ` and city_id = $${params.length}`;
+  }
+  if (query.topic) {
+    params.push(query.topic.toLowerCase());
+    sql += ` and ($${params.length} = any(hashtags) or $${params.length} = any(video_tags))`;
   }
   params.push(Math.min(query.limit ?? 500, 2000));
   sql += ` order by followers desc limit $${params.length}`;
