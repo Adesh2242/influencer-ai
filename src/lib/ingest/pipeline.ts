@@ -24,6 +24,7 @@ import {
   getVideos,
   QUOTA_COST,
   QuotaMeter,
+  QuotaExceededError,
   searchChannels,
   type YouTubeChannel,
 } from "./youtube";
@@ -219,20 +220,35 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
   };
 
   // 1. Discovery. Each search costs 100 units, so stop as soon as the budget cannot take another.
+  // Our meter is an estimate of what Google is counting, so it can disagree with the real quota.
+  // When Google says stop, keep everything found so far rather than losing the run.
   const channelIds = new Set<string>();
   let queriesRun = 0;
+  let quotaExhausted = false;
   for (const query of queries) {
     if (!quota.canAfford(QUOTA_COST.search)) break;
     quota.charge(QUOTA_COST.search);
     queriesRun++;
-    for (const id of await searchChannels(query, { relevanceLanguage: "mr", regionCode: "IN" })) {
-      channelIds.add(id);
+    try {
+      for (const id of await searchChannels(query, { relevanceLanguage: "mr", regionCode: "IN" })) {
+        channelIds.add(id);
+      }
+    } catch (error) {
+      if (!(error instanceof QuotaExceededError)) throw error;
+      quotaExhausted = true;
+      break;
     }
   }
 
   // 2. Enrichment, batched 50 at a time.
   quota.charge(Math.ceil(channelIds.size / 50) * QUOTA_COST.channels);
-  const channels = await getChannels([...channelIds]);
+  let channels: YouTubeChannel[] = [];
+  try {
+    channels = await getChannels([...channelIds]);
+  } catch (error) {
+    if (!(error instanceof QuotaExceededError)) throw error;
+    quotaExhausted = true;
+  }
 
   const creators: SourcedCreator[] = [];
   for (const channel of channels) {
@@ -260,10 +276,17 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
 
     // 3. Reach and engagement from the channel's own recent videos.
     if (!quota.canAfford(QUOTA_COST.playlistItems + QUOTA_COST.videos)) break;
-    quota.charge(QUOTA_COST.playlistItems);
-    const videoIds = await getRecentVideoIds(channel.uploadsPlaylistId, 25);
-    quota.charge(QUOTA_COST.videos);
-    const videos = await getVideos(videoIds);
+    let videos;
+    try {
+      quota.charge(QUOTA_COST.playlistItems);
+      const videoIds = await getRecentVideoIds(channel.uploadsPlaylistId, 25);
+      quota.charge(QUOTA_COST.videos);
+      videos = await getVideos(videoIds);
+    } catch (error) {
+      if (!(error instanceof QuotaExceededError)) throw error;
+      quotaExhausted = true;
+      break;
+    }
 
     const window = recentVideos(videos, recentDays, now);
     const metrics = computeMetrics(window.length >= 3 ? window : videos, now);
@@ -286,6 +309,6 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
     channelsInspected: channels.length,
     rejections,
     quotaSpent: quota.spent,
-    quotaExhausted: quota.remaining < QUOTA_COST.search,
+    quotaExhausted: quotaExhausted || quota.remaining < QUOTA_COST.search,
   };
 }

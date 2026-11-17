@@ -33,7 +33,7 @@ export async function closePool(): Promise<void> {
   pool = undefined;
 }
 
-const SCHEMA = `
+export const SCHEMA = `
 create table if not exists creators (
   id                  text primary key,
   platform            text         not null,
@@ -55,6 +55,13 @@ create table if not exists creators (
   record              jsonb        not null,
   unique (platform, external_id)
 );
+-- "create table if not exists" does nothing to a table that already exists, so a column added
+-- after a deployment has run would never appear. Every column added after the first release has
+-- to be stated again here as an additive alter, before any index that references it.
+alter table creators add column if not exists hashtags        text[]       not null default '{}';
+alter table creators add column if not exists video_tags      text[]       not null default '{}';
+alter table creators add column if not exists sponsored_ratio numeric(5,3) not null default 0;
+
 create index if not exists creators_followers_idx  on creators (followers desc);
 create index if not exists creators_city_idx       on creators (city_id);
 create index if not exists creators_confidence_idx on creators (location_confidence);
