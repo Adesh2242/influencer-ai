@@ -421,8 +421,11 @@ export const CREATOR_TIERS: Record<
   }
 > = {
   nano: {
-    label: "Nano (1K-10K)",
-    minFollowers: 1_000,
+    // Extended down from 1K when ingestion started collecting smaller regional creators: a brand
+    // targeting one Maharashtra district often wants exactly these, and labelling a 600-subscriber
+    // creator "1K-10K" would be wrong.
+    label: "Nano (500-10K)",
+    minFollowers: 500,
     maxFollowers: 10_000,
     engagementBenchmark: 5,
     reelRate: [2_000, 12_000],

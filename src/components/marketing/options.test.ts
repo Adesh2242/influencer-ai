@@ -25,7 +25,8 @@ describe("sign-up form options", () => {
 
   it("offers one follower range per creator tier, matching the tier bounds", () => {
     expect(FOLLOWER_OPTIONS).toHaveLength(CREATOR_TIER_LIST.length);
-    expect(FOLLOWER_OPTIONS[0]?.value).toBe("1K–10K (Nano)");
+    expect(FOLLOWER_OPTIONS[0]?.value).toBe("500–10K (Nano)");
+    // The top tier is open-ended, so it reads "1M+" rather than a range.
     expect(FOLLOWER_OPTIONS.at(-1)?.value).toBe("1M+ (Mega)");
     for (const tier of CREATOR_TIER_LIST) {
       expect(tierForFollowers(CREATOR_TIERS[tier].minFollowers)).toBe(tier);

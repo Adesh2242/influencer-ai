@@ -321,8 +321,14 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
   for (const channel of channels) {
     if (creators.length >= maxCreators) break;
 
-    if (channel.hiddenSubscriberCount || channel.subscriberCount < minSubscribers) {
-      reject("too small or subscriber count hidden");
+    // Two different problems: a hidden count cannot be scored at any threshold, while a small
+    // channel is a policy choice. Counting them together hides which one the filter is really doing.
+    if (channel.hiddenSubscriberCount) {
+      reject("subscriber count hidden");
+      continue;
+    }
+    if (channel.subscriberCount < minSubscribers) {
+      reject(`under ${minSubscribers} subscribers`);
       continue;
     }
 
