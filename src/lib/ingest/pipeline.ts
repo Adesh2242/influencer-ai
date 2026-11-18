@@ -17,6 +17,7 @@ import { computeMetrics, median, recentVideos, type ChannelMetrics } from "./met
 import { buildContentProfile, topicsFrom, type ContentProfile } from "./content";
 import { estimateAuthenticity, estimateRates } from "./estimate";
 import { classifyNiches } from "./niche";
+import { safeSlice } from "../text";
 import { YOUTUBE_PROVENANCE, type ProvenanceMap, type SourceRecord } from "./provenance";
 import {
   getChannels,
@@ -214,7 +215,7 @@ export function toCreator(
     id: `yt-${channel.id}`,
     name: channel.title,
     handle,
-    bio: channel.description.split("\n")[0]?.slice(0, 280) ?? "",
+    bio: safeSlice(channel.description.split("\n")[0] ?? "", 0, 280),
     homeCityId: home.id,
     languages,
     niches: niches.length > 0 ? niches : ["lifestyle"],

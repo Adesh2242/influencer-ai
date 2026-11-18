@@ -6,6 +6,7 @@
 // columns carry the indexes, so nothing is lost by keeping the body opaque.
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
+import { wellFormedDeep } from "../lib/text";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
 
 let pool: Pool | undefined;
@@ -134,42 +135,61 @@ on conflict (id) do update set
  * Replaces the stored copy of each creator. An ingestion re-run refreshes figures in place rather
  * than appending, so a creator keeps one row and one id across runs.
  */
-export async function upsertCreators(records: SourcedCreator[]): Promise<number> {
-  if (records.length === 0) return 0;
+export interface UpsertResult {
+  stored: number;
+  /** Records the database refused, with the reason, so a run reports them instead of dying. */
+  rejected: { id: string; reason: string }[];
+}
+
+export async function upsertCreators(records: SourcedCreator[]): Promise<UpsertResult> {
+  if (records.length === 0) return { stored: 0, rejected: [] };
   const client = await getPool().connect();
+  const rejected: UpsertResult["rejected"] = [];
+  let stored = 0;
   try {
     await client.query("begin");
     for (const record of records) {
       const { creator, source, location, metrics } = record;
-      await client.query(UPSERT, [
-        creator.id,
-        source.platform,
-        source.externalId,
-        creator.name,
-        creator.handle,
-        creator.homeCityId,
-        location.confidence,
-        location.marathiContent,
-        creator.platforms[0]?.followers ?? 0,
-        metrics.avgViews,
-        metrics.engagementRate,
-        creator.authenticity.score,
-        creator.niches,
-        record.content.hashtags,
-        record.content.tags,
-        record.content.sponsoredRatio,
-        source.fetchedAt,
-        JSON.stringify(record),
-      ]);
-      // Append-only history. Re-running on the same day is a no-op rather than a duplicate.
-      await client.query(
-        `insert into creator_snapshots (creator_id, captured_at, followers, avg_views, engagement_rate)
-         values ($1,$2,$3,$4,$5) on conflict (creator_id, captured_at) do nothing`,
-        [creator.id, source.fetchedAt, creator.platforms[0]?.followers ?? 0, metrics.avgViews, metrics.engagementRate],
-      );
+      // Each creator gets a savepoint: one row the database refuses rolls back to here instead of
+      // aborting the transaction and losing the entire run, which has happened twice.
+      await client.query("savepoint creator_row");
+      try {
+        await client.query(UPSERT, [
+          creator.id,
+          source.platform,
+          source.externalId,
+          creator.name,
+          creator.handle,
+          creator.homeCityId,
+          location.confidence,
+          location.marathiContent,
+          creator.platforms[0]?.followers ?? 0,
+          metrics.avgViews,
+          metrics.engagementRate,
+          creator.authenticity.score,
+          creator.niches,
+          record.content.hashtags,
+          record.content.tags,
+          record.content.sponsoredRatio,
+          source.fetchedAt,
+          // Platform text can hold a lone surrogate, which Postgres rejects as invalid JSON.
+          JSON.stringify(wellFormedDeep(record)),
+        ]);
+        // Append-only history. Re-running on the same day is a no-op rather than a duplicate.
+        await client.query(
+          `insert into creator_snapshots (creator_id, captured_at, followers, avg_views, engagement_rate)
+           values ($1,$2,$3,$4,$5) on conflict (creator_id, captured_at) do nothing`,
+          [creator.id, source.fetchedAt, creator.platforms[0]?.followers ?? 0, metrics.avgViews, metrics.engagementRate],
+        );
+        await client.query("release savepoint creator_row");
+        stored++;
+      } catch (error) {
+        await client.query("rollback to savepoint creator_row");
+        rejected.push({ id: creator.id, reason: error instanceof Error ? error.message : String(error) });
+      }
     }
     await client.query("commit");
-    return records.length;
+    return { stored, rejected };
   } catch (error) {
     await client.query("rollback");
     throw error;

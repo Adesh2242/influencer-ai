@@ -81,8 +81,13 @@ async function main(): Promise<void> {
   }
 
   await migrate();
-  const stored = await upsertCreators(report.creators);
+  const { stored, rejected } = await upsertCreators(report.creators);
+  if (rejected.length > 0) {
+    console.warn(`\n  ${rejected.length} record(s) refused by the database:`);
+    for (const row of rejected.slice(0, 5)) console.warn(`    ${row.id}: ${row.reason.slice(0, 120)}`);
+  }
   await recordIngestRun(startedAt, stored, report.quotaSpent, {
+    rejected: rejected.length,
     queriesRun: report.queriesRun,
     channelsInspected: report.channelsInspected,
     rejections: report.rejections,

@@ -4,6 +4,7 @@
 // returns nothing at all, so the state has to be read out of the creator's own self-description.
 // That is a guess, and the verdict carries both a confidence and the evidence behind it so the UI
 // can show a brand why a creator was placed in Maharashtra rather than asserting it silently.
+import { safeSlice } from "../text";
 import {
   DEVANAGARI,
   LOCATION_MARKERS,
@@ -89,7 +90,7 @@ interface Hit {
 function quote(text: string, at: number, length: number): string {
   const start = Math.max(0, at - 24);
   const end = Math.min(text.length, at + length + 24);
-  const snippet = text.slice(start, end).replace(/\s+/g, " ").trim();
+  const snippet = safeSlice(text, start, end).replace(/\s+/g, " ").trim();
   return `${start > 0 ? "…" : ""}${snippet}${end < text.length ? "…" : ""}`;
 }
 
