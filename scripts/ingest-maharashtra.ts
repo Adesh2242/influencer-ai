@@ -5,6 +5,12 @@
 //
 // This is what the scheduled ingestion service runs on Railway. It needs a YouTube Data API key in
 // YOUTUBE_API_KEY, and writes to Postgres through DATABASE_URL when one is configured.
+//
+// SCHEDULING: the YouTube Data API quota resets at midnight PACIFIC, not UTC — 08:00 UTC in winter
+// and 07:00 UTC in summer. A job scheduled before that runs against the tail of the previous quota
+// day and finds nothing if that day was spent. The Railway cron is set to 09:00 UTC, which is
+// safely after the reset in both halves of the year. A run at 03:00 UTC returned zero creators for
+// exactly this reason.
 import { writeFile } from "node:fs/promises";
 import { closePool, migrate, recordIngestRun, upsertCreators } from "../src/server/db";
 import { ingestMaharashtra } from "../src/lib/ingest/pipeline";
