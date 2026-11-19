@@ -8,6 +8,7 @@
 // influencer marketing, but Meta's Business Discovery API needs app review and only answers for a
 // handle you already know, so it can only be added once that review is done. Everything below the
 // CandidateSource boundary is platform-agnostic.
+import { MH_PLACES } from "../../data/maharashtra";
 import { CITY_BY_ID, tierForFollowers } from "../../data/taxonomy";
 import { buildAudience } from "../../data/generator/generate";
 import { Rng } from "../../data/generator/random";
@@ -48,28 +49,11 @@ const CONFIDENCE_RANK: Record<LocationConfidence, number> = { none: 0, weak: 1, 
  * brand shortlists. Pairing a niche with a place or with Marathi words surfaces individuals.
  */
 export const SEED_TERMS = {
-  places: [
-    "Pune",
-    "Mumbai",
-    "Nagpur",
-    "Nashik",
-    "Kolhapur",
-    "Thane",
-    "Aurangabad",
-    "Solapur",
-    "Amravati",
-    "Navi Mumbai",
-    "Jalgaon",
-    "Sangli",
-    "Satara",
-    "Latur",
-    "Akola",
-    "Chandrapur",
-    "Ahmednagar",
-    "Ratnagiri",
-    "Nanded",
-    "Maharashtra",
-  ],
+  // Drawn from the gazetteer rather than a hand-picked few, so the query pool scales with the
+  // places we know about. A hardcoded 20 capped the pool at ~510 queries, which a daily run of 80
+  // cycles through in under a week — after which it re-searches the same ground for diminishing
+  // returns. All 55 places give a pool big enough for a fortnight of genuinely new searches.
+  places: [...MH_PLACES.map((place) => place.name), "Maharashtra"],
   niches: [
     "food vlog",
     "recipe",

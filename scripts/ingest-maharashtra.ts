@@ -24,9 +24,9 @@ function arg(name: string, fallback?: string): string | undefined {
 
 async function main(): Promise<void> {
   const out = arg("out");
-  const maxCreators = Number(arg("max", "400"));
+  const maxCreators = Number(arg("max", "800"));
   const minSubscribers = Number(arg("min-subs", "500"));
-  const maxQueries = Number(arg("queries", "40"));
+  const maxQueries = Number(arg("queries", "80"));
   // Rotate the seed queries by the day, so a daily job explores new ground each run instead of
   // rediscovering the same channels. --offset overrides it for a manual backfill.
   const seedOffset = Number(arg("offset", String(Math.floor(Date.now() / 86_400_000) * maxQueries)));

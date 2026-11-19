@@ -29,3 +29,19 @@ describe("seed queries", () => {
     expect(buildSeedQueries(10_000, 7)).toEqual(allSeedQueries());
   });
 });
+
+describe("seed pool size", () => {
+  it("is large enough that a daily run does not cycle back within a fortnight", () => {
+    const perDay = 80;
+    const cycleDays = allSeedQueries().length / perDay;
+    // Re-searching the same ground finds the same channels, so the pool has to outlast the rate.
+    expect(cycleDays).toBeGreaterThan(14);
+  });
+
+  it("covers every place in the gazetteer, not a hand-picked few", () => {
+    const all = allSeedQueries().join(" | ");
+    for (const place of ["Mumbai", "Pune", "Chiplun", "Gadchiroli", "Sindhudurg"]) {
+      expect(all, `${place} missing from seed queries`).toContain(place);
+    }
+  });
+});
