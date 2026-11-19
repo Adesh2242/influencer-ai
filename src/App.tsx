@@ -6,6 +6,7 @@ import { CreatorProvider } from "@/data/creatorStore";
 // Each page is its own chunk; the Layout's <Suspense> shows a loader while one downloads.
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const MatchPage = lazy(() => import("@/pages/MatchPage"));
+const PlanPage = lazy(() => import("@/pages/PlanPage"));
 const DiscoverPage = lazy(() => import("@/pages/DiscoverPage"));
 const CreatorPage = lazy(() => import("@/pages/CreatorPage"));
 const ShortlistPage = lazy(() => import("@/pages/ShortlistPage"));
@@ -21,6 +22,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="match" element={<MatchPage />} />
+          <Route path="plan" element={<PlanPage />} />
           <Route path="discover" element={<DiscoverPage />} />
           <Route path="creators/:id" element={<CreatorPage />} />
           <Route path="shortlist" element={<ShortlistPage />} />

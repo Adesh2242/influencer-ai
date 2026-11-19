@@ -13,6 +13,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: "/match", label: "Match" },
+  { to: "/plan", label: "Plan" },
   { to: "/discover", label: "Discover" },
   { to: "/shortlist", label: "Shortlist" },
   { to: "/for-creators", label: "For creators" },

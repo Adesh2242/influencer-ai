@@ -5,7 +5,7 @@
 // them sees the campaign, what that costs per thousand against the category norm, and whether the
 // mix of creator sizes suits the goal. Those are the questions a planner is paid to answer, and
 // every one of them is computable from what the ingestion already collects.
-import { CREATOR_TIER_LIST } from "../data/taxonomy";
+import { CREATOR_TIER_LIST, CREATOR_TIERS } from "../data/taxonomy";
 import { estimateRate } from "./pricing";
 import { coverageBySubRegion, regionalValue, SUB_REGIONS, type CoverageRow } from "./regional";
 import { upcomingFestivals } from "../data/calendar";
@@ -46,6 +46,10 @@ export interface PlannedCreator {
   /** Views estimated to land inside Maharashtra, and what they cost per thousand. */
   localViews: number;
   localCPM: number;
+  /** Why this creator is in the plan, in words a client will accept. */
+  rationale: string[];
+  /** What to check before committing budget to them. */
+  risks: string[];
 }
 
 export interface PlanInsight {
@@ -121,6 +125,56 @@ export function uniqueReachOf(viewCounts: readonly number[], universe = DEFAULT_
   return Math.round(universe * (1 - notReached));
 }
 
+/** Plain-language reasons this creator earns a place in the plan. */
+function rationaleFor(
+  creator: Creator,
+  regional: ReturnType<typeof regionalValue>,
+  rate: ReturnType<typeof estimateRate>,
+): string[] {
+  const out: string[] = [];
+  const platform = creator.platforms[0];
+  const benchmark = CREATOR_TIERS[creator.tier].engagementBenchmark;
+
+  if (regional.share >= 0.6) {
+    out.push(`About ${Math.round(regional.share * 100)}% of the audience is in Maharashtra — ${inr(regional.localCPM)} per thousand relevant views.`);
+  }
+  if (creator.languages.includes("mr")) {
+    out.push("Publishes in Marathi, so the audience is in-state and the message does not need translating.");
+  }
+  if ((platform?.engagementRate ?? 0) > benchmark) {
+    out.push(`${platform?.engagementRate.toFixed(1)}% engagement against a ${benchmark}% benchmark for ${creator.tier} creators.`);
+  }
+  if (rate.verdict === "underpriced") {
+    out.push("Delivers more reach than the tier usually asks for — good value before the rate card catches up.");
+  }
+  if (creator.authenticity.score >= 85) {
+    out.push("No reach-consistency anomalies: views, subscribers and comments move together.");
+  }
+  const topics = creator.topics.slice(0, 3);
+  if (topics.length > 0) out.push(`Posts about ${topics.join(", ")}.`);
+  return out;
+}
+
+/** What a planner should check before committing budget. */
+function risksFor(creator: Creator, regional: ReturnType<typeof regionalValue>): string[] {
+  const out: string[] = [];
+  const platform = creator.platforms[0];
+
+  if (regional.share < 0.35) {
+    out.push(`Only about ${Math.round(regional.share * 100)}% of views land in Maharashtra — real cost is ${inr(regional.localCPM)} per thousand relevant views.`);
+  }
+  if (creator.authenticity.score < 70) {
+    out.push(`Authenticity estimate ${creator.authenticity.score}/100. ${creator.authenticity.flags[0] ?? ""}`.trim());
+  }
+  if (platform && platform.followers > 0 && platform.avgViews / platform.followers < 0.03 && platform.followers > 10_000) {
+    out.push(`Median views are ${((platform.avgViews / platform.followers) * 100).toFixed(1)}% of subscribers — expect well below headline reach.`);
+  }
+  if ((platform?.postsPerMonth ?? 0) < 1) {
+    out.push("Posts less than once a month; confirm they are still active before booking.");
+  }
+  return out;
+}
+
 function concentration(creators: readonly Creator[], key: (c: Creator) => string): { top: string; share: number } {
   const counts = new Map<string, number>();
   for (const creator of creators) {
@@ -139,6 +193,15 @@ export interface PlanOptions {
   maxCreators?: number;
   /** Injected by tests so festival timing is deterministic. */
   now?: Date;
+  /**
+   * What to optimise for when choosing between candidates.
+   *   localCPM   cheapest reach that lands in Maharashtra (the default, and usually right)
+   *   reach      most views per rupee, wherever they land
+   *   engagement most reactive audience first
+   */
+  rank?: "localCPM" | "reach" | "engagement";
+  /** Restrict to creators publishing in Marathi. */
+  marathiOnly?: boolean;
 }
 
 /**
@@ -147,10 +210,24 @@ export interface PlanOptions {
  * delivers, and the matching score has already decided who is eligible to be here.
  */
 export function buildMediaPlan(pool: readonly Creator[], budget: number, options: PlanOptions = {}): MediaPlan {
-  const { goal = "awareness", deliverable = "reel", universe = DEFAULT_UNIVERSE, maxCreators } = options;
+  const {
+    goal = "awareness",
+    deliverable = "reel",
+    universe = DEFAULT_UNIVERSE,
+    maxCreators,
+    rank = "localCPM",
+    marathiOnly = false,
+  } = options;
   const targetMix = GOAL_MIX[goal];
 
+  const ranked = (a: PlannedCreator, b: PlannedCreator): number => {
+    if (rank === "reach") return b.expectedViews / Math.max(b.fee, 1) - a.expectedViews / Math.max(a.fee, 1);
+    if (rank === "engagement") return (b.creator.platforms[0]?.engagementRate ?? 0) - (a.creator.platforms[0]?.engagementRate ?? 0);
+    return a.localCPM - b.localCPM;
+  };
+
   const priced = pool
+    .filter((creator) => !marathiOnly || creator.languages.includes("mr"))
     .map((creator) => {
       const rate = estimateRate(creator, deliverable);
       const views = creator.platforms[0]?.avgViews ?? 0;
@@ -162,6 +239,8 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
         cpm: rate.effectiveCPM,
         localViews: regional.localViews,
         localCPM: regional.localCPM,
+        rationale: rationaleFor(creator, regional, rate),
+        risks: risksFor(creator, regional),
       };
     })
     .filter((entry) => entry.fee > 0 && entry.expectedViews > 0);
@@ -178,7 +257,7 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
       .filter((entry) => entry.creator.tier === tier && !chosen.some((c) => c.creator.id === entry.creator.id))
       // Sorted on local CPM, not national: a plan for a Maharashtra brand should prefer the
       // creator who delivers relevant views cheaply, not the one who looks cheap nationally.
-      .sort((a, b) => a.localCPM - b.localCPM);
+      .sort(ranked);
 
     for (const entry of candidates) {
       if (chosen.length >= limit) break;
@@ -198,7 +277,7 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
     .filter((entry) => (targetMix[entry.creator.tier] ?? 0) > 0)
     .sort(
       (a, b) =>
-        (targetMix[b.creator.tier] ?? 0) - (targetMix[a.creator.tier] ?? 0) || a.localCPM - b.localCPM,
+        (targetMix[b.creator.tier] ?? 0) - (targetMix[a.creator.tier] ?? 0) || ranked(a, b),
     );
   for (const entry of leftovers) {
     if (chosen.length >= limit) break;
