@@ -130,3 +130,38 @@ describe("multipliers", () => {
     expect(authenticityMultiplier(40)).toBeLessThan(0.7);
   });
 });
+
+/** Regressions from a max-level review. Each of these shipped. */
+describe("review regressions", () => {
+  it("prices an unknown deliverable as a reel rather than NaN", () => {
+    const c = creator({ tier: "mid", followers: 200_000, avgViews: 60_000 });
+    const rate = estimateRate(c, "carousel" as never);
+    expect(Number.isFinite(rate.fairValue)).toBe(true);
+    expect(Number.isFinite(rate.likelyAsk)).toBe(true);
+    // The NaN version reported a confident "overpriced" verdict with an Infinity gap.
+    expect(rate.negotiationNote).not.toContain("NaN");
+    expect(rate.fairValue).toBe(estimateRate(c, "reel").fairValue);
+  });
+
+  it("prices a video off the platform that carries video, not platforms[0]", () => {
+    const c = creator({ tier: "micro", followers: 50_000, avgViews: 20_000 });
+    c.platforms = [
+      { platform: "instagram", handle: "ig", followers: 50_000, avgViews: 20_000, engagementRate: 3, postsPerMonth: 8 },
+      { platform: "youtube", handle: "yt", followers: 2_000, avgViews: 300, engagementRate: 3, postsPerMonth: 4 },
+    ];
+    const card = rateCardFor(c);
+    // Priced off 20,000 Instagram views, the integration came out ~90x too high.
+    expect(card.video!).toBeLessThan(card.reel);
+  });
+
+  it("keeps the rate card in order for the small channels the ingestion collects", () => {
+    // A single flat ₹500 floor collapsed post and story to the same number here.
+    for (const [followers, views] of [[1_000, 1_000], [60_000, 1_500], [500, 200]] as const) {
+      const c = creator({ tier: followers > 10_000 ? "micro" : "nano", followers, avgViews: views });
+      const card = rateCardFor(c);
+      expect(card.video!, `video vs reel at ${views} views`).toBeGreaterThan(card.reel);
+      expect(card.reel, `reel vs post at ${views} views`).toBeGreaterThan(card.post);
+      expect(card.post, `post vs story at ${views} views`).toBeGreaterThan(card.story);
+    }
+  });
+});

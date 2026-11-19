@@ -20,7 +20,11 @@ export interface Festival {
   id: string;
   name: string;
   marathiName?: string;
-  /** Inclusive month/day window the festival falls inside. Months are 1-12. */
+  /**
+   * The span the festival's date falls inside across years — an uncertainty range for the lunar
+   * ones, not the length of the celebration. Kept tight: too wide a tail reports a festival as
+   * still in progress weeks after it has passed.
+   */
   window: { fromMonth: number; fromDay: number; toMonth: number; toDay: number };
   /** True when the date is solar and therefore stable year to year. */
   fixedDate: boolean;
@@ -64,7 +68,7 @@ export const MH_FESTIVALS: Festival[] = [
     id: "diwali-padwa",
     name: "Diwali and Bhaubeej",
     marathiName: "दिवाळी",
-    window: { fromMonth: 10, fromDay: 15, toMonth: 11, toDay: 20 },
+    window: { fromMonth: 10, fromDay: 20, toMonth: 11, toDay: 15 },
     fixedDate: false,
     categories: ["fashion", "beauty", "food", "tech", "lifestyle", "automotive"],
     rateMultiplier: 2.2,
@@ -122,19 +126,29 @@ export const MH_FESTIVALS: Festival[] = [
   },
 ];
 
-/** Midpoint of a festival's window in the given year, as a date. */
-function windowMidpoint(festival: Festival, year: number): Date {
+interface Window {
+  from: number;
+  to: number;
+  midpoint: number;
+}
+
+function windowIn(festival: Festival, year: number): Window {
   const from = Date.UTC(year, festival.window.fromMonth - 1, festival.window.fromDay);
   const to = Date.UTC(
     festival.window.toMonth < festival.window.fromMonth ? year + 1 : year,
     festival.window.toMonth - 1,
     festival.window.toDay,
+    23,
+    59,
+    59,
   );
-  return new Date((from + to) / 2);
+  return { from, to, midpoint: (from + to) / 2 };
 }
 
 export interface UpcomingFestival {
   festival: Festival;
+  /** True when today falls inside the festival's window. */
+  happeningNow: boolean;
   /** Days until the middle of the window. Approximate for lunar festivals. */
   daysAway: number;
   /** Days until creators in demand are typically committed. Negative means the window has passed. */
@@ -150,19 +164,28 @@ export interface UpcomingFestival {
  * the two solar festivals, because the lunar dates shift year to year.
  */
 export function upcomingFestivals(from: Date = new Date(), withinDays = 365): UpcomingFestival[] {
+  // A non-numeric horizon used to disable the filter silently and return the whole year.
+  const horizon = Number.isFinite(withinDays) ? withinDays : 365;
+  const now = from.getTime();
   const out: UpcomingFestival[] = [];
+
   for (const festival of MH_FESTIVALS) {
-    // Try this year and next, and take whichever midpoint is next in the future.
-    const candidates = [windowMidpoint(festival, from.getUTCFullYear()), windowMidpoint(festival, from.getUTCFullYear() + 1)];
-    const next = candidates.find((date) => date.getTime() >= from.getTime());
+    const year = from.getUTCFullYear();
+    // Taking the next future MIDPOINT skipped a festival that had already started: during Ganpati
+    // itself the planner said nothing about Ganpati and pointed at next year's instead. Select on
+    // the window's END, so an event in progress is still the next one.
+    const candidates = [windowIn(festival, year - 1), windowIn(festival, year), windowIn(festival, year + 1)];
+    const next = candidates.find((w) => w.to >= now);
     if (!next) continue;
 
-    const daysAway = Math.round((next.getTime() - from.getTime()) / 86_400_000);
-    if (daysAway > withinDays) continue;
+    const happeningNow = now >= next.from && now <= next.to;
+    const daysAway = happeningNow ? 0 : Math.round((next.midpoint - now) / 86_400_000);
+    if (daysAway > horizon) continue;
 
     const daysToBook = daysAway - festival.bookingLeadWeeks * 7;
     out.push({
       festival,
+      happeningNow,
       daysAway,
       daysToBook,
       bookNow: daysToBook <= 21 && daysToBook > 0,

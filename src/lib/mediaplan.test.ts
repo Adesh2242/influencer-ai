@@ -144,3 +144,53 @@ describe("inrCompact", () => {
     expect(inrCompact(25_000)).toBe("₹25K");
   });
 });
+
+/** Regressions from a max-level review. Each of these shipped. */
+describe("review regressions", () => {
+  it("does not throw on an unrecognised goal", () => {
+    expect(() => buildMediaPlan(roster, 50_00_000, { goal: "nonsense" as never })).not.toThrow();
+  });
+
+  it("books a repeated creator once, not once per copy", () => {
+    const one = creator("mid", 250_000, 70_000);
+    const plan = buildMediaPlan([one, one, one], 1_00_00_000);
+    expect(plan.creators).toHaveLength(1);
+    expect(plan.reach.impressions).toBe(70_000);
+  });
+
+  it("does not deduplicate national impressions against the Maharashtra universe", () => {
+    // 60 national creators used to pin unique reach at the state's population, invent a
+    // frequency of 5.0 and claim 99% penetration while placing 10% of views in-state.
+    const national = Array.from({ length: 60 }, () =>
+      creator("mega", 5_000_000, 5_000_000, "mumbai"),
+    ).map((c) => ({ ...c, languages: ["en"] as const }) as typeof c);
+    const plan = buildMediaPlan(national, 100_00_00_000);
+    expect(plan.reach.frequency).toBeLessThan(2);
+    expect(plan.regional.penetration).toBeLessThan(100);
+  });
+
+  it("reports penetration against the Maharashtra audience, using in-state reach", () => {
+    const plan = buildMediaPlan(roster, 1_00_00_000);
+    expect(plan.regional.penetration).toBeCloseTo((plan.regional.localUniqueReach / plan.regional.universe) * 100, 1);
+  });
+
+  it("names the missing sub-regions rather than one of their district lists", () => {
+    const allPune = Array.from({ length: 6 }, () => creator("mid", 250_000, 70_000, "pune"));
+    const insight = buildMediaPlan(allPune, 20_00_00_000).insights.find((i) => i.headline.startsWith("No creators in"));
+    expect(insight?.detail).toContain("Vidarbha");
+    expect(insight?.detail).toContain("Konkan");
+  });
+
+  it("picks the right unit when rounding crosses a boundary", () => {
+    expect(inrCompact(99_99_999)).toBe("₹1 Cr");
+    expect(inrCompact(99_999)).toBe("₹1 L");
+    expect(inrCompact(10_00_000)).toBe("₹10 L");
+  });
+});
+
+describe("inrCompact across the full range", () => {
+  it("does not promote a small number into the next unit", () => {
+    expect(inrCompact(500)).toBe("₹500");
+    expect(inrCompact(999)).toBe("₹999");
+  });
+});

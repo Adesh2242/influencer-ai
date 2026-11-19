@@ -140,3 +140,27 @@ describe("risk flags in a plan", () => {
     }
   });
 });
+
+/** Regressions from a max-level review. Each of these shipped. */
+describe("review regressions", () => {
+  it("makes reach-led a genuinely different plan from balanced", () => {
+    // At a budget that binds. Above the roster's total value every strategy buys everyone, and
+    // converging there is correct — the point is that they differ when the money runs out.
+    const comparison = comparePlans(roster, 5_00_000, { now: NOW });
+    const reach = comparison.scenarios.find((s) => s.id === "reach")!.plan;
+    const balanced = comparison.scenarios.find((s) => s.id === "balanced")!.plan;
+    // Ranked on views-per-rupee these were byte-identical, because fee is proportional to views.
+    const same =
+      reach.creators.length === balanced.creators.length &&
+      reach.regional.localUniqueReach === balanced.regional.localUniqueReach &&
+      reach.regional.localCPM === balanced.regional.localCPM;
+    expect(same).toBe(false);
+  });
+
+  it("never recommends a plan that reaches nobody in the state at a quoted ₹0", () => {
+    const comparison = comparePlans(roster, 50_00_000, { now: NOW });
+    expect(comparison.recommendation.because).not.toContain("₹0 ");
+    const recommended = comparison.scenarios.find((s) => s.id === comparison.recommendation.scenarioId)!;
+    expect(recommended.plan.regional.localImpressions).toBeGreaterThan(0);
+  });
+});

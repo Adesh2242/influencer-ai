@@ -5,7 +5,7 @@
 // that conversation is easier with numbers in front of everyone. "₹10 lakh buys either 8.2 lakh
 // people once, or 2.1 lakh people three times from creators who publish in Marathi" is a decision
 // a marketing head can make. A single ranked list is not.
-import { buildMediaPlan, type MediaPlan, type PlanOptions } from "./mediaplan";
+import { buildMediaPlan, pricePool, type MediaPlan, type PlanOptions } from "./mediaplan";
 import type { CampaignGoal, Creator } from "../types";
 
 export type ScenarioId = "reach" | "maharashtra" | "conversion" | "balanced";
@@ -99,10 +99,12 @@ export function comparePlans(
   options: CompareOptions = {},
 ): ScenarioComparison {
   const ids = options.only ?? (Object.keys(SPECS) as ScenarioId[]);
+  // One pricing pass shared by every scenario, rather than one per scenario.
+  const pricedPool = pricePool(pool, options.deliverable ?? "reel");
 
   const scenarios: Scenario[] = ids.map((id) => {
     const spec = SPECS[id];
-    const plan = buildMediaPlan(pool, budget, { ...options, ...spec.options });
+    const plan = buildMediaPlan(pool, budget, { ...options, ...spec.options, pricedPool });
     return { id, name: spec.name, thesis: spec.thesis, bestFor: spec.bestFor, plan, highlights: highlightsFor(plan) };
   });
 
@@ -141,7 +143,12 @@ function recommend(scenarios: readonly Scenario[], clientGoal?: CampaignGoal): S
     (a, b) => b.plan.regional.localUniqueReach - a.plan.regional.localUniqueReach,
   )[0];
 
-  const cheapest = [...viable].sort((a, b) => a.plan.regional.localCPM - b.plan.regional.localCPM)[0];
+  // localCPM is 0 when a plan places no views in the state, which sorted the worst option first
+  // and recommended it at "₹0 per thousand". Only plans that actually reach Maharashtra qualify.
+  const withLocalReach = viable.filter((s) => s.plan.regional.localImpressions > 0);
+  const cheapest = [...(withLocalReach.length > 0 ? withLocalReach : viable)].sort(
+    (a, b) => a.plan.regional.localCPM - b.plan.regional.localCPM,
+  )[0];
 
   // A brand that has told us what it wants should get that, unless following it costs a large
   // share of the reach available — in which case say so rather than quietly overriding them.

@@ -5,7 +5,7 @@
 // line says why it is there and what to check before committing. The CSV at the bottom is what
 // gets emailed afterwards.
 import { useDeferredValue, useId, useMemo, useState } from "react";
-import { AlertTriangle, CircleCheck, Download, Info, TriangleAlert } from "lucide-react";
+import { CircleCheck, Download, Info, OctagonAlert, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 import { DatasetState } from "@/components/creators/DatasetState";
 import { CreatorIdentity } from "@/components/creators/shared";
@@ -26,7 +26,7 @@ const PRESETS = [2_00_000, 5_00_000, 10_00_000, 25_00_000, 1_00_00_000];
 const fmt = (n: number) => n.toLocaleString("en-IN");
 
 const INSIGHT_STYLE: Record<PlanInsight["severity"], { icon: typeof Info; className: string }> = {
-  critical: { icon: AlertTriangle, className: "border-rose-200 bg-rose-50 text-rose-900" },
+  critical: { icon: OctagonAlert, className: "border-rose-200 bg-rose-50 text-rose-900" },
   warning: { icon: TriangleAlert, className: "border-amber-200 bg-amber-50 text-amber-900" },
   good: { icon: CircleCheck, className: "border-emerald-200 bg-emerald-50 text-emerald-900" },
   info: { icon: Info, className: "border-slate-200 bg-slate-50 text-slate-700" },

@@ -92,3 +92,26 @@ describe("festivalsForNiche", () => {
     expect(festivalsForNiche("gaming")).toEqual([]);
   });
 });
+
+describe("a festival already in progress", () => {
+  it("is still the next one, rather than being skipped to next year", () => {
+    // Inside Ganesh Chaturthi's window, past its midpoint. This used to return next year's
+    // instance at ~359 days, which the planner's 120-day horizon then dropped entirely — so
+    // during Ganpati the plan said nothing about Ganpati.
+    const list = upcomingFestivals(new Date("2026-09-10T00:00:00Z"));
+    expect(list[0].festival.id).toBe("ganesh-chaturthi");
+    expect(list[0].happeningNow).toBe(true);
+    expect(list[0].daysAway).toBe(0);
+  });
+
+  it("survives a short horizon, because it is happening right now", () => {
+    const list = upcomingFestivals(new Date("2026-09-10T00:00:00Z"), 5);
+    expect(list.map((u) => u.festival.id)).toContain("ganesh-chaturthi");
+  });
+
+  it("treats a non-numeric horizon as the default rather than no filter", () => {
+    const bad = upcomingFestivals(new Date("2026-11-19T00:00:00Z"), Number("abc"));
+    const good = upcomingFestivals(new Date("2026-11-19T00:00:00Z"));
+    expect(bad).toHaveLength(good.length);
+  });
+});

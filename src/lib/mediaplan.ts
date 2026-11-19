@@ -19,6 +19,16 @@ import type { CampaignGoal, Creator, CreatorTier, Deliverable } from "../types";
 export const DEFAULT_UNIVERSE = 6_00_00_000;
 
 /**
+ * Online-video adults across India, used only to deduplicate national impressions.
+ *
+ * Folding national views into the Maharashtra universe was producing nonsense: a plan of national
+ * creators pinned unique reach at the state's population, reported 99% penetration of Maharashtra
+ * while placing 10% of its views there, and then warned about a frequency of 5.0 that was purely
+ * an artefact of the cap. Each figure now deduplicates against the audience it is drawn from.
+ */
+export const NATIONAL_UNIVERSE = 60_00_00_000;
+
+/**
  * Target share of spend by tier, per goal.
  *
  * Awareness buys reach, and reach is cheapest in absolute terms from large creators. Conversions
@@ -70,9 +80,8 @@ export interface MediaPlan {
     uniqueReach: number;
     /** Average times a reached person sees the campaign. */
     frequency: number;
+    /** The audience these national figures are deduplicated against. */
     universe: number;
-    /** Share of the addressable universe reached. */
-    penetration: number;
   };
   efficiency: {
     blendedCPM: number;
@@ -91,6 +100,10 @@ export interface MediaPlan {
     localCPM: number;
     /** Share of all bought views that land in Maharashtra. */
     localShare: number;
+    /** Share of Maharashtra's online-video adults reached at least once. */
+    penetration: number;
+    /** The Maharashtra audience the local figures are deduplicated against. */
+    universe: number;
     coverage: CoverageRow[];
   };
   insights: PlanInsight[];
@@ -100,9 +113,23 @@ const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 /** Compact Indian money: ₹20 Cr, ₹4.5 L. */
 export function inrCompact(n: number): string {
-  if (n >= 1_00_00_000) return `₹${(n / 1_00_00_000).toFixed(n % 1_00_00_000 === 0 ? 0 : 1)} Cr`;
-  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(n % 1_00_000 === 0 ? 0 : 1)} L`;
-  if (n >= 1_000) return `₹${(n / 1_000).toFixed(0)}K`;
+  // The unit is chosen from the value AFTER rounding. Choosing it first reported ₹99,99,999 as
+  // "₹100.0 L" rather than ₹1 Cr, which reached the page heading and the CSV filename.
+  // `floor` is how close to the unit a value must be to use it. Lakh and crore promote from just
+  // below, because ₹99,99,999 reads as a crore; thousands do not, because ₹999 should read ₹999
+  // rather than being rounded up into "₹1K".
+  const bands: [divisor: number, suffix: string, decimals: number, floor: number][] = [
+    [1_00_00_000, " Cr", 1, 0.95],
+    [1_00_000, " L", 1, 0.95],
+    [1_000, "K", 0, 1],
+  ];
+  for (const [divisor, suffix, decimals, floor] of bands) {
+    const scaled = n / divisor;
+    if (scaled < floor) continue;
+    // Strip a trailing .0 so a rounded ₹99,99,999 reads "₹1 Cr", not "₹1.0 Cr".
+    const text = scaled.toFixed(decimals).replace(/\.0$/, "");
+    return `₹${text}${suffix}`;
+  }
   return inr(n);
 }
 
@@ -166,7 +193,7 @@ function risksFor(creator: Creator, regional: ReturnType<typeof regionalValue>):
   if (creator.authenticity.score < 70) {
     out.push(`Authenticity estimate ${creator.authenticity.score}/100. ${creator.authenticity.flags[0] ?? ""}`.trim());
   }
-  if (platform && platform.followers > 0 && platform.avgViews / platform.followers < 0.03 && platform.followers > 10_000) {
+  if (platform && platform.followers > 10_000 && platform.avgViews / platform.followers < 0.03) {
     out.push(`Median views are ${((platform.avgViews / platform.followers) * 100).toFixed(1)}% of subscribers — expect well below headline reach.`);
   }
   if ((platform?.postsPerMonth ?? 0) < 1) {
@@ -194,6 +221,12 @@ export interface PlanOptions {
   /** Injected by tests so festival timing is deterministic. */
   now?: Date;
   /**
+   * A pool already priced by a previous call. comparePlans builds four plans from one pool, and
+   * pricing it four times meant ~8,000 rate estimates and tens of thousands of formatted strings
+   * per budget change, on the render path.
+   */
+  pricedPool?: readonly PlannedCreator[];
+  /**
    * What to optimise for when choosing between candidates.
    *   localCPM   cheapest reach that lands in Maharashtra (the default, and usually right)
    *   reach      most views per rupee, wherever they land
@@ -209,25 +242,20 @@ export interface PlanOptions {
  * remainder on whatever is left. Value is reach per rupee, not score: a plan is judged on what it
  * delivers, and the matching score has already decided who is eligible to be here.
  */
-export function buildMediaPlan(pool: readonly Creator[], budget: number, options: PlanOptions = {}): MediaPlan {
-  const {
-    goal = "awareness",
-    deliverable = "reel",
-    universe = DEFAULT_UNIVERSE,
-    maxCreators,
-    rank = "localCPM",
-    marathiOnly = false,
-  } = options;
-  const targetMix = GOAL_MIX[goal];
-
-  const ranked = (a: PlannedCreator, b: PlannedCreator): number => {
-    if (rank === "reach") return b.expectedViews / Math.max(b.fee, 1) - a.expectedViews / Math.max(a.fee, 1);
-    if (rank === "engagement") return (b.creator.platforms[0]?.engagementRate ?? 0) - (a.creator.platforms[0]?.engagementRate ?? 0);
-    return a.localCPM - b.localCPM;
-  };
-
-  const priced = pool
+/**
+ * Prices a pool once: fee, expected reach, local reach, and the display prose each booked creator
+ * carries. Deduplicates by id first — the per-tier guard this replaced could never catch a repeat,
+ * so a pool containing the same creator twice booked and billed them twice.
+ */
+export function pricePool(
+  pool: readonly Creator[],
+  deliverable: Deliverable = "reel",
+  marathiOnly = false,
+): PlannedCreator[] {
+  const seen = new Set<string>();
+  return pool
     .filter((creator) => !marathiOnly || creator.languages.includes("mr"))
+    .filter((creator) => !seen.has(creator.id) && seen.add(creator.id))
     .map((creator) => {
       const rate = estimateRate(creator, deliverable);
       const views = creator.platforms[0]?.avgViews ?? 0;
@@ -243,7 +271,36 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
         risks: risksFor(creator, regional),
       };
     })
-    .filter((entry) => entry.fee > 0 && entry.expectedViews > 0);
+    .filter((entry) => entry.expectedViews > 0);
+}
+
+export function buildMediaPlan(pool: readonly Creator[], budget: number, options: PlanOptions = {}): MediaPlan {
+  const {
+    goal = "awareness",
+    deliverable = "reel",
+    universe = DEFAULT_UNIVERSE,
+    maxCreators,
+    rank = "localCPM",
+    marathiOnly = false,
+  } = options;
+  // An unrecognised goal reaching here used to throw a TypeError and return a 500 from /api/plan.
+  const targetMix = GOAL_MIX[goal] ?? GOAL_MIX.awareness;
+
+  const ranked = (a: PlannedCreator, b: PlannedCreator): number => {
+    // Not views-per-rupee: fee is proportional to views, so that ratio is constant within a tier
+    // and "reach-led" collapsed into the balanced plan. Buying the biggest audiences first is what
+    // the strategy actually means.
+    if (rank === "reach") return b.expectedViews - a.expectedViews;
+    if (rank === "engagement") return (b.creator.platforms[0]?.engagementRate ?? 0) - (a.creator.platforms[0]?.engagementRate ?? 0);
+    return a.localCPM - b.localCPM;
+  };
+
+  // Deduplicate by id before anything else. The per-tier guard below could never catch a repeat
+  // (tiers partition the pool, and it tested a snapshot taken before the loop), so a pool with the
+  // same creator twice booked and billed them twice and inflated every headline number.
+  const priced = options.pricedPool
+    ? options.pricedPool.filter((entry) => !marathiOnly || entry.creator.languages.includes("mr"))
+    : pricePool(pool, deliverable, marathiOnly);
 
   const chosen: PlannedCreator[] = [];
   let spend = 0;
@@ -287,7 +344,7 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
   }
 
   const impressions = chosen.reduce((sum, entry) => sum + entry.expectedViews, 0);
-  const uniqueReach = uniqueReachOf(chosen.map((entry) => entry.expectedViews), universe);
+  const uniqueReach = uniqueReachOf(chosen.map((entry) => entry.expectedViews), NATIONAL_UNIVERSE);
   const frequency = uniqueReach > 0 ? impressions / uniqueReach : 0;
   const blendedCPM = impressions > 0 ? Math.round((spend / impressions) * 1000) : 0;
 
@@ -309,8 +366,7 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
       impressions,
       uniqueReach,
       frequency: Number(frequency.toFixed(2)),
-      universe,
-      penetration: Number(((uniqueReach / universe) * 100).toFixed(2)),
+      universe: NATIONAL_UNIVERSE,
     },
     efficiency: {
       blendedCPM,
@@ -324,6 +380,8 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
       localUniqueReach,
       localCPM: localImpressions > 0 ? Math.round((spend / localImpressions) * 1000) : 0,
       localShare: impressions > 0 ? Number(((localImpressions / impressions) * 100).toFixed(1)) : 0,
+      penetration: universe > 0 ? Number(((localUniqueReach / universe) * 100).toFixed(2)) : 0,
+      universe,
       coverage: coverageBySubRegion(chosen.map((entry) => entry.creator)),
     },
     insights: [],
@@ -366,7 +424,9 @@ function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal, no
       headline: `No creators in ${empty.map((row) => row.label).join(", ")}`,
       detail:
         `About ${(missed / 1_00_00_000).toFixed(1)} crore people in sub-regions this plan does not touch. ` +
-        `Maharashtra is planned by sub-region, not by city tier — ${SUB_REGIONS[empty[0].subRegion].note} is its own market.`,
+        `Maharashtra is planned by sub-region, not by city tier: ` +
+        empty.map((row) => `${row.label} (${SUB_REGIONS[row.subRegion].note})`).join("; ") +
+        ` ${empty.length === 1 ? "is" : "are"} their own markets.`,
     });
   }
 
@@ -375,7 +435,7 @@ function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal, no
   if (next) {
     const f = next.festival;
     insights.push({
-      severity: next.bookNow ? "warning" : next.tooLate ? "info" : "info",
+      severity: next.bookNow || next.tooLate ? "warning" : "info",
       headline: next.tooLate
         ? `${f.name} is ${next.daysAway} days away — the usual booking window has closed`
         : `${f.name} is about ${next.daysAway} days away`,
@@ -392,7 +452,8 @@ function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal, no
       severity: "critical",
       headline: `${inrCompact(plan.unspent)} of ${inrCompact(plan.budget)} cannot be spent on this roster`,
       detail:
-        `Every creator worth booking is already in the plan — ${plan.creators.length} of ${poolSize} available. ` +
+        `${plan.creators.length} of ${poolSize} available creators are in the plan; the rest are either ` +
+        `in tiers this goal does not buy, or priced above what their reach is worth. ` +
         `Paying more than fair value for the rest buys nothing extra. Widen the brief, add more creators ` +
         `to the database, or run the campaign in flights across several months.`,
     });
@@ -440,7 +501,7 @@ function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal, no
   // Where the money went versus where the goal wanted it.
   const heavy = plan.mix.filter((row) => row.share > 0).sort((a, b) => b.share - a.share)[0];
   if (heavy) {
-    const target = GOAL_MIX[goal][heavy.tier] ?? 0;
+    const target = (GOAL_MIX[goal] ?? GOAL_MIX.awareness)[heavy.tier] ?? 0;
     if (heavy.share > target + 0.2) {
       insights.push({
         severity: "warning",

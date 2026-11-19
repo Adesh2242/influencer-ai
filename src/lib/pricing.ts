@@ -13,7 +13,7 @@
 //
 // For a healthy creator these land close together. When they diverge the gap is the most useful
 // thing a buyer can be told, because it is exactly the negotiating position.
-import { CREATOR_TIERS } from "../data/taxonomy";
+import { CREATOR_TIERS, PLATFORMS } from "../data/taxonomy";
 import type { Creator, CreatorTier, Deliverable } from "../types";
 
 /**
@@ -40,6 +40,24 @@ export const FORMAT_MULTIPLIER: Record<Deliverable, number> = {
   story: 0.2,
 };
 
+/**
+ * Per-format minimum fees. A creator will not get out of bed for less, and the minimums differ by
+ * format for the same reason the rates do: a long-form integration is a day's work, a story is a
+ * few minutes. Applying one flat floor collapsed every format to the same number for the small
+ * channels this product actually collects, which inverted the rate card.
+ */
+export const MIN_FEE: Record<Deliverable, number> = {
+  video: 2_500,
+  reel: 1_500,
+  post: 1_000,
+  story: 500,
+};
+
+/** Falls back to a reel for anything unrecognised, rather than pricing it as NaN. */
+function asDeliverable(value: Deliverable): Deliverable {
+  return value in FORMAT_MULTIPLIER ? value : "reel";
+}
+
 /** An audience that reacts is worth paying more to reach; a flat one is worth less. */
 export function engagementMultiplier(engagementRate: number, tier: CreatorTier): number {
   const benchmark = CREATOR_TIERS[tier].engagementBenchmark;
@@ -57,11 +75,20 @@ export function authenticityMultiplier(score: number): number {
   return 0.55;
 }
 
-/** Rupee fees are quoted in round numbers. */
-function roundFee(value: number): number {
-  if (value >= 1_00_000) return Math.max(500, Math.round(value / 25_000) * 25_000);
-  if (value >= 10_000) return Math.max(500, Math.round(value / 2_500) * 2_500);
-  return Math.max(500, Math.round(value / 500) * 500);
+/**
+ * Rupee fees are quoted in round numbers, coarser as they get larger. The floor is per-format so
+ * the card keeps its order: rounding a story and a post to the same ₹500 made post < story false.
+ */
+function roundFee(value: number, deliverable: Deliverable = "reel"): number {
+  const floor = MIN_FEE[deliverable] ?? MIN_FEE.reel;
+  if (!Number.isFinite(value)) return floor;
+  const rounded =
+    value >= 1_00_000
+      ? Math.round(value / 25_000) * 25_000
+      : value >= 10_000
+        ? Math.round(value / 2_500) * 2_500
+        : Math.round(value / 500) * 500;
+  return Math.max(floor, rounded);
 }
 
 export interface RateWorking {
@@ -99,15 +126,28 @@ function positionInTier(followers: number, tier: CreatorTier): number {
  * What the creator quotes. Anchored to followers because that is what a media kit leads with, and
  * positioned inside the tier's market range rather than at an arbitrary point in it.
  */
-export function likelyAsk(followers: number, tier: CreatorTier, deliverable: Deliverable = "reel"): number {
+export function likelyAsk(followers: number, tier: CreatorTier, requested: Deliverable = "reel"): number {
+  const deliverable = asDeliverable(requested);
   const [low, high] = CREATOR_TIERS[tier].reelRate;
   const reelAsk = low + positionInTier(followers, tier) * (high - low);
   // reelRate is quoted for a reel; scale to the requested format.
-  return roundFee((reelAsk / FORMAT_MULTIPLIER.reel) * FORMAT_MULTIPLIER[deliverable]);
+  return roundFee((reelAsk / FORMAT_MULTIPLIER.reel) * FORMAT_MULTIPLIER[deliverable], deliverable);
 }
 
-export function estimateRate(creator: Creator, deliverable: Deliverable = "reel"): RateEstimate {
-  const platform = creator.platforms[0];
+/**
+ * The platform a deliverable would actually run on. Pricing a YouTube integration off an
+ * Instagram-primary creator's Instagram views overstated the fee by roughly 90x in testing,
+ * and that figure was written into creator.rates and then read by the matching engine.
+ */
+export function platformFor(creator: Creator, deliverable: Deliverable): Creator["platforms"][number] | undefined {
+  return (
+    creator.platforms.find((p) => PLATFORMS[p.platform]?.deliverables.includes(deliverable)) ?? creator.platforms[0]
+  );
+}
+
+export function estimateRate(creator: Creator, requested: Deliverable = "reel"): RateEstimate {
+  const deliverable = asDeliverable(requested);
+  const platform = platformFor(creator, deliverable);
   const views = platform?.avgViews ?? 0;
   const followers = platform?.followers ?? 0;
   const tier = creator.tier;
@@ -116,7 +156,7 @@ export function estimateRate(creator: Creator, deliverable: Deliverable = "reel"
   const base = (views / 1000) * cpm;
   const engagement = engagementMultiplier(platform?.engagementRate ?? 0, tier);
   const authenticity = authenticityMultiplier(creator.authenticity.score);
-  const fairValue = roundFee(base * engagement * authenticity);
+  const fairValue = roundFee(base * engagement * authenticity, deliverable);
   const ask = likelyAsk(followers, tier, deliverable);
   const gap = fairValue > 0 ? ask / fairValue : Infinity;
 
@@ -157,11 +197,11 @@ export function estimateRate(creator: Creator, deliverable: Deliverable = "reel"
 
 /** Full rate card at fair value, for the Creator model. */
 export function rateCardFor(creator: Creator): { reel: number; story: number; post: number; video: number | null } {
-  const hasYouTube = creator.platforms.some((p) => p.platform === "youtube");
+  const carriesVideo = creator.platforms.some((p) => PLATFORMS[p.platform]?.deliverables.includes("video"));
   return {
     reel: estimateRate(creator, "reel").fairValue,
     story: estimateRate(creator, "story").fairValue,
     post: estimateRate(creator, "post").fairValue,
-    video: hasYouTube ? estimateRate(creator, "video").fairValue : null,
+    video: carriesVideo ? estimateRate(creator, "video").fairValue : null,
   };
 }

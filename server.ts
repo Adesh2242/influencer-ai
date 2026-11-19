@@ -13,7 +13,14 @@ import { findLookalikes, growthFrom, topicCoOccurrence } from "./src/lib/analyti
 import { buildMediaPlan } from "./src/lib/mediaplan";
 import { estimateRate } from "./src/lib/pricing";
 import { upcomingFestivals } from "./src/data/calendar";
+import { GOAL_LIST, DELIVERABLE_LIST } from "./src/data/taxonomy";
 import type { CampaignGoal, Deliverable } from "./src/types";
+
+/** Query parameters come from a URL, so every one of them is attacker-controlled text. */
+function oneOf<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T | undefined {
+  if (value === null) return fallback;
+  return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
 import {
   countCreators,
   getCreator,
@@ -208,37 +215,54 @@ export const server = createServer((req, res) => {
       // What a budget actually buys: reach after duplication, frequency, CPM against benchmark,
       // and where the plan disagrees with the campaign goal.
       if (url.pathname === "/api/plan") {
-        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
         const budget = Number(url.searchParams.get("budget") ?? 0);
         if (!Number.isFinite(budget) || budget <= 0) {
           return void sendJson(res, 400, { error: "invalid_budget", message: "Pass a budget in rupees." });
         }
+        const goal = oneOf<CampaignGoal>(url.searchParams.get("goal"), GOAL_LIST, "awareness");
+        const deliverable = oneOf<Deliverable>(url.searchParams.get("deliverable"), DELIVERABLE_LIST, "reel");
+        if (!goal || !deliverable) {
+          return void sendJson(res, 400, {
+            error: "invalid_request",
+            message: `goal must be one of ${GOAL_LIST.join(", ")}; deliverable one of ${DELIVERABLE_LIST.join(", ")}.`,
+          });
+        }
+        const maxRaw = url.searchParams.get("max");
+        const maxCreators = maxRaw === null ? undefined : Number(maxRaw);
+        if (maxCreators !== undefined && (!Number.isFinite(maxCreators) || maxCreators <= 0)) {
+          return void sendJson(res, 400, { error: "invalid_request", message: "max must be a positive number." });
+        }
+
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+
         const pool = await listCreators({ minConfidence: "likely", limit: 2000 });
-        const plan = buildMediaPlan(
-          pool.map((record) => record.creator),
-          budget,
-          {
-            goal: (url.searchParams.get("goal") as CampaignGoal | null) ?? "awareness",
-            deliverable: (url.searchParams.get("deliverable") as Deliverable | null) ?? "reel",
-            maxCreators: url.searchParams.get("max") ? Number(url.searchParams.get("max")) : undefined,
-          },
-        );
+        const plan = buildMediaPlan(pool.map((record) => record.creator), budget, { goal, deliverable, maxCreators });
         return void sendJson(res, 200, plan, "no-store");
       }
 
       // What a creator will ask, what their reach is worth, and the arithmetic between them.
       const rateMatch = /^\/api\/creators\/([^/]+)\/rate$/.exec(url.pathname);
       if (rateMatch) {
+        const deliverable = oneOf<Deliverable>(url.searchParams.get("deliverable"), DELIVERABLE_LIST, "reel");
+        if (!deliverable) {
+          return void sendJson(res, 400, {
+            error: "invalid_request",
+            message: `deliverable must be one of ${DELIVERABLE_LIST.join(", ")}.`,
+          });
+        }
         if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
         const record = await getCreator(decodeURIComponent(rateMatch[1]));
         if (!record) return void sendJson(res, 404, { error: "not_found" });
-        const deliverable = (url.searchParams.get("deliverable") as Deliverable | null) ?? "reel";
         return void sendJson(res, 200, estimateRate(record.creator, deliverable), "public, max-age=300");
       }
 
       // The state's own commercial calendar: what is coming, and how long to commit.
       if (url.pathname === "/api/calendar") {
-        const within = Number(url.searchParams.get("days") ?? 365);
+        const daysRaw = url.searchParams.get("days");
+        const within = daysRaw === null ? 365 : Number(daysRaw);
+        if (!Number.isFinite(within) || within <= 0) {
+          return void sendJson(res, 400, { error: "invalid_request", message: "days must be a positive number." });
+        }
         return void sendJson(res, 200, { festivals: upcomingFestivals(new Date(), within) }, "public, max-age=3600");
       }
 

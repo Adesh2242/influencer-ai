@@ -80,14 +80,9 @@ const CITY_SUB_REGION: Record<string, SubRegion> = (() => {
     const region = DISTRICT_SUB_REGION[place.district];
     if (region && place.cityId) map[place.cityId] = region;
   }
-  // Cities the taxonomy knows that the gazetteer maps under a different name.
-  map.mumbai ??= "mumbai_metro";
-  map.pune ??= "western";
-  map.nagpur ??= "vidarbha";
-  map.nashik ??= "north";
-  map.sambhajinagar ??= "marathwada";
-  map.kolhapur ??= "western";
-  map.nanded ??= "marathwada";
+  // No hand-written fallbacks: every district in the gazetteer appears in DISTRICT_SUB_REGION, so
+  // the loop above already covers every mapped city. A test asserts that, which is more use than
+  // a list that silently shadows the gazetteer if a district is ever regrouped.
   return map;
 })();
 

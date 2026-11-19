@@ -150,3 +150,14 @@ describe("coverageBySubRegion", () => {
     expect(row.localViews).toBeLessThan(100_000);
   });
 });
+
+describe("every Maharashtra city resolves to a sub-region", () => {
+  it("needs no hand-written fallbacks", async () => {
+    const { CITIES } = await import("../data/taxonomy");
+    const mh = CITIES.filter((city) => city.state === "Maharashtra");
+    expect(mh.length).toBeGreaterThan(5);
+    for (const city of mh) {
+      expect(subRegionOf(city.id), `${city.name} has no sub-region`).toBeDefined();
+    }
+  });
+});
