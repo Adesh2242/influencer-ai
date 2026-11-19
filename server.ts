@@ -10,6 +10,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { handleParseBrief } from "./netlify/lib/parse-brief-handler";
 import { findLookalikes, growthFrom, topicCoOccurrence } from "./src/lib/analytics";
+import { buildMediaPlan } from "./src/lib/mediaplan";
+import { estimateRate } from "./src/lib/pricing";
+import type { CampaignGoal, Deliverable } from "./src/types";
 import {
   countCreators,
   getCreator,
@@ -199,6 +202,37 @@ export const server = createServer((req, res) => {
         const sources = await listTopicSources();
         const pairs = topicCoOccurrence(sources, Number(url.searchParams.get("limit") ?? 40));
         return void sendJson(res, 200, { creators: sources.length, pairs }, "public, max-age=600");
+      }
+
+      // What a budget actually buys: reach after duplication, frequency, CPM against benchmark,
+      // and where the plan disagrees with the campaign goal.
+      if (url.pathname === "/api/plan") {
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+        const budget = Number(url.searchParams.get("budget") ?? 0);
+        if (!Number.isFinite(budget) || budget <= 0) {
+          return void sendJson(res, 400, { error: "invalid_budget", message: "Pass a budget in rupees." });
+        }
+        const pool = await listCreators({ minConfidence: "likely", limit: 2000 });
+        const plan = buildMediaPlan(
+          pool.map((record) => record.creator),
+          budget,
+          {
+            goal: (url.searchParams.get("goal") as CampaignGoal | null) ?? "awareness",
+            deliverable: (url.searchParams.get("deliverable") as Deliverable | null) ?? "reel",
+            maxCreators: url.searchParams.get("max") ? Number(url.searchParams.get("max")) : undefined,
+          },
+        );
+        return void sendJson(res, 200, plan, "no-store");
+      }
+
+      // What a creator will ask, what their reach is worth, and the arithmetic between them.
+      const rateMatch = /^\/api\/creators\/([^/]+)\/rate$/.exec(url.pathname);
+      if (rateMatch) {
+        if (!hasDatabase()) return void sendJson(res, 503, { error: "no_database" });
+        const record = await getCreator(decodeURIComponent(rateMatch[1]));
+        if (!record) return void sendJson(res, 404, { error: "not_found" });
+        const deliverable = (url.searchParams.get("deliverable") as Deliverable | null) ?? "reel";
+        return void sendJson(res, 200, estimateRate(record.creator, deliverable), "public, max-age=300");
       }
 
       if (url.pathname === "/api/parse-brief") {

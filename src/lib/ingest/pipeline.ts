@@ -16,7 +16,8 @@ import type { Creator, LanguageCode, Platform } from "../../types";
 import { detectMaharashtra, type LocationConfidence, type LocationVerdict } from "./location";
 import { computeMetrics, median, recentVideos, type ChannelMetrics } from "./metrics";
 import { buildContentProfile, topicsFrom, type ContentProfile } from "./content";
-import { estimateAuthenticity, estimateRates } from "./estimate";
+import { estimateAuthenticity } from "./estimate";
+import { rateCardFor } from "../pricing";
 import { classifyNiches } from "./niche";
 import { safeSlice } from "../text";
 import { YOUTUBE_PROVENANCE, type ProvenanceMap, type SourceRecord } from "./provenance";
@@ -227,7 +228,7 @@ export function toCreator(
     }),
     authenticity,
     brandSafety: { score: 80, flags: [] },
-    rates: estimateRates(metrics, tier, true),
+    rates: { reel: 0, story: 0, post: 0, video: null },
     collaborations: [],
     responseRate: 0.5,
     avgTurnaroundDays: 7,
@@ -237,6 +238,9 @@ export function toCreator(
     avatarHue: seedFrom(channel.id) % 360,
     avatarUrl: channel.avatarUrl,
   };
+
+  // Rates are priced off the finished creator, so they are assigned once it exists.
+  creator.rates = rateCardFor(creator);
 
   return {
     creator,

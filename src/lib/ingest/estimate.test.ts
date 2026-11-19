@@ -1,41 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { engagementMultiplier, estimateAuthenticity, estimateRates } from "./estimate";
+import { estimateAuthenticity } from "./estimate";
 import type { ChannelMetrics } from "./metrics";
 
 function metrics(over: Partial<ChannelMetrics> = {}): ChannelMetrics {
   return { avgViews: 50_000, engagementRate: 3.5, postsPerMonth: 6, sampleSize: 12, likesHidden: false, ...over };
 }
-
-describe("estimateRates", () => {
-  it("prices off measured views, so more reach costs more", () => {
-    const small = estimateRates(metrics({ avgViews: 10_000 }), "micro");
-    const large = estimateRates(metrics({ avgViews: 100_000 }), "micro");
-    expect(large.reel).toBeGreaterThan(small.reel);
-    expect(large.reel / small.reel).toBeCloseTo(10, 0);
-  });
-
-  it("charges a lower CPM as creators get bigger", () => {
-    const perThousand = (tier: "nano" | "mega") => estimateRates(metrics({ avgViews: 100_000 }), tier).reel / 100;
-    expect(perThousand("nano")).toBeGreaterThan(perThousand("mega"));
-  });
-
-  it("returns round rupee figures and no sub-₹500 fee", () => {
-    const rates = estimateRates(metrics({ avgViews: 200 }), "nano");
-    for (const fee of [rates.reel, rates.story, rates.post]) {
-      expect(fee % 500).toBe(0);
-      expect(fee).toBeGreaterThanOrEqual(500);
-    }
-  });
-
-  it("leaves video null for a creator with no YouTube channel", () => {
-    expect(estimateRates(metrics(), "mid", false).video).toBeNull();
-  });
-
-  it("pays a premium for engagement and discounts a flat audience", () => {
-    expect(engagementMultiplier(9)).toBeGreaterThan(engagementMultiplier(3.5));
-    expect(engagementMultiplier(0.4)).toBeLessThan(1);
-  });
-});
 
 describe("estimateAuthenticity", () => {
   it("leaves a healthy channel unflagged", () => {

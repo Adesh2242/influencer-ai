@@ -1,59 +1,9 @@
-// Fields the Creator model needs that no free source reports. Every number here is modelled from
-// real reach by a stated formula and is marked "estimated" in the provenance map, so the UI can
-// show it as an estimate rather than a fact. None of it is observed.
-import type { CreatorTier, RateCard } from "../../types";
+// The authenticity proxy: a field the Creator model needs that no free source reports.
+//
+// Rate cards used to live here too, priced at display-media CPMs. That model put 57 of 60 real
+// creators below their own tier's market floor and has been replaced by lib/pricing.ts, which
+// separates what a creator asks from what their reach is worth.
 import type { ChannelMetrics } from "./metrics";
-
-/**
- * Indicative Indian CPM bands in rupees per 1,000 views, by creator size. Rates fall per thousand
- * as audiences grow: a nano creator's few thousand views cost more each than a mega creator's.
- * These are planning benchmarks for the Indian market, not quotes — a creator's real price depends
- * on exclusivity, usage rights and how badly the brand wants them.
- */
-export const CPM_BY_TIER: Record<CreatorTier, { video: number; short: number }> = {
-  nano: { video: 700, short: 420 },
-  micro: { video: 550, short: 330 },
-  mid: { video: 420, short: 250 },
-  macro: { video: 320, short: 190 },
-  mega: { video: 240, short: 145 },
-};
-
-/** Engagement lifts or discounts the price: an audience that reacts is worth paying more to reach. */
-export function engagementMultiplier(engagementRate: number): number {
-  if (engagementRate >= 8) return 1.35;
-  if (engagementRate >= 5) return 1.2;
-  if (engagementRate >= 3) return 1.05;
-  if (engagementRate >= 1.5) return 1;
-  return 0.85;
-}
-
-/** Rupee fees are quoted in round numbers: nearest ₹500, never below ₹500. */
-function roundFee(value: number): number {
-  return Math.max(500, Math.round(value / 500) * 500);
-}
-
-/**
- * Builds an indicative rate card from measured reach.
- *
- *   fee = (median views / 1000) × CPM for the tier and format × engagement multiplier
- *
- * Priced off views rather than subscribers on purpose: a brand buys the views, and subscriber counts
- * on YouTube lag reality badly.
- */
-export function estimateRates(metrics: ChannelMetrics, tier: CreatorTier, hasYouTube = true): RateCard {
-  const cpm = CPM_BY_TIER[tier];
-  const multiplier = engagementMultiplier(metrics.engagementRate);
-  const thousands = metrics.avgViews / 1000;
-
-  const short = roundFee(thousands * cpm.short * multiplier);
-  return {
-    reel: short,
-    // A story is a lighter, shorter-lived placement; a static post sits between the two.
-    story: roundFee(short * 0.35),
-    post: roundFee(short * 0.7),
-    video: hasYouTube ? roundFee(thousands * cpm.video * multiplier) : null,
-  };
-}
 
 export interface AuthenticityEstimate {
   score: number;
