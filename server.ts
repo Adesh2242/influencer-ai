@@ -12,6 +12,7 @@ import { handleParseBrief } from "./netlify/lib/parse-brief-handler";
 import { findLookalikes, growthFrom, topicCoOccurrence } from "./src/lib/analytics";
 import { buildMediaPlan } from "./src/lib/mediaplan";
 import { estimateRate } from "./src/lib/pricing";
+import { upcomingFestivals } from "./src/data/calendar";
 import type { CampaignGoal, Deliverable } from "./src/types";
 import {
   countCreators,
@@ -233,6 +234,12 @@ export const server = createServer((req, res) => {
         if (!record) return void sendJson(res, 404, { error: "not_found" });
         const deliverable = (url.searchParams.get("deliverable") as Deliverable | null) ?? "reel";
         return void sendJson(res, 200, estimateRate(record.creator, deliverable), "public, max-age=300");
+      }
+
+      // The state's own commercial calendar: what is coming, and how long to commit.
+      if (url.pathname === "/api/calendar") {
+        const within = Number(url.searchParams.get("days") ?? 365);
+        return void sendJson(res, 200, { festivals: upcomingFestivals(new Date(), within) }, "public, max-age=3600");
       }
 
       if (url.pathname === "/api/parse-brief") {

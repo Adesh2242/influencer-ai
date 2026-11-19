@@ -7,6 +7,8 @@
 // every one of them is computable from what the ingestion already collects.
 import { CREATOR_TIER_LIST } from "../data/taxonomy";
 import { estimateRate } from "./pricing";
+import { coverageBySubRegion, regionalValue, SUB_REGIONS, type CoverageRow } from "./regional";
+import { upcomingFestivals } from "../data/calendar";
 import type { CampaignGoal, Creator, CreatorTier, Deliverable } from "../types";
 
 /**
@@ -41,6 +43,9 @@ export interface PlannedCreator {
   fee: number;
   expectedViews: number;
   cpm: number;
+  /** Views estimated to land inside Maharashtra, and what they cost per thousand. */
+  localViews: number;
+  localCPM: number;
 }
 
 export interface PlanInsight {
@@ -74,6 +79,16 @@ export interface MediaPlan {
     vsBenchmark: number;
   };
   mix: { tier: CreatorTier; count: number; spend: number; share: number }[];
+  /** The only reach figure a Maharashtra brand should plan on. */
+  regional: {
+    localImpressions: number;
+    localUniqueReach: number;
+    /** Cost per 1,000 views that actually land in the state. */
+    localCPM: number;
+    /** Share of all bought views that land in Maharashtra. */
+    localShare: number;
+    coverage: CoverageRow[];
+  };
   insights: PlanInsight[];
 }
 
@@ -122,6 +137,8 @@ export interface PlanOptions {
   universe?: number;
   /** Cap on creators; omit to let the budget decide. */
   maxCreators?: number;
+  /** Injected by tests so festival timing is deterministic. */
+  now?: Date;
 }
 
 /**
@@ -137,7 +154,15 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
     .map((creator) => {
       const rate = estimateRate(creator, deliverable);
       const views = creator.platforms[0]?.avgViews ?? 0;
-      return { creator, fee: rate.fairValue, expectedViews: views, cpm: rate.effectiveCPM };
+      const regional = regionalValue(creator, rate.fairValue);
+      return {
+        creator,
+        fee: rate.fairValue,
+        expectedViews: views,
+        cpm: rate.effectiveCPM,
+        localViews: regional.localViews,
+        localCPM: regional.localCPM,
+      };
     })
     .filter((entry) => entry.fee > 0 && entry.expectedViews > 0);
 
@@ -151,7 +176,9 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
     let tierSpend = 0;
     const candidates = priced
       .filter((entry) => entry.creator.tier === tier && !chosen.some((c) => c.creator.id === entry.creator.id))
-      .sort((a, b) => a.cpm - b.cpm);
+      // Sorted on local CPM, not national: a plan for a Maharashtra brand should prefer the
+      // creator who delivers relevant views cheaply, not the one who looks cheap nationally.
+      .sort((a, b) => a.localCPM - b.localCPM);
 
     for (const entry of candidates) {
       if (chosen.length >= limit) break;
@@ -171,7 +198,7 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
     .filter((entry) => (targetMix[entry.creator.tier] ?? 0) > 0)
     .sort(
       (a, b) =>
-        (targetMix[b.creator.tier] ?? 0) - (targetMix[a.creator.tier] ?? 0) || a.cpm - b.cpm,
+        (targetMix[b.creator.tier] ?? 0) - (targetMix[a.creator.tier] ?? 0) || a.localCPM - b.localCPM,
     );
   for (const entry of leftovers) {
     if (chosen.length >= limit) break;
@@ -190,6 +217,9 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
     const tierSpend = inTier.reduce((sum, entry) => sum + entry.fee, 0);
     return { tier, count: inTier.length, spend: tierSpend, share: spend > 0 ? tierSpend / spend : 0 };
   });
+
+  const localImpressions = chosen.reduce((sum, entry) => sum + entry.localViews, 0);
+  const localUniqueReach = uniqueReachOf(chosen.map((entry) => entry.localViews), universe);
 
   const plan: MediaPlan = {
     budget,
@@ -210,16 +240,72 @@ export function buildMediaPlan(pool: readonly Creator[], budget: number, options
       vsBenchmark: Number((((blendedCPM - CATEGORY_CPM_BENCHMARK) / CATEGORY_CPM_BENCHMARK) * 100).toFixed(1)),
     },
     mix,
+    regional: {
+      localImpressions,
+      localUniqueReach,
+      localCPM: localImpressions > 0 ? Math.round((spend / localImpressions) * 1000) : 0,
+      localShare: impressions > 0 ? Number(((localImpressions / impressions) * 100).toFixed(1)) : 0,
+      coverage: coverageBySubRegion(chosen.map((entry) => entry.creator)),
+    },
     insights: [],
   };
 
-  plan.insights = buildInsights(plan, priced.length, goal);
+  plan.insights = buildInsights(plan, priced.length, goal, options.now);
   return plan;
 }
 
-function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal): PlanInsight[] {
+function buildInsights(plan: MediaPlan, poolSize: number, goal: CampaignGoal, now = new Date()): PlanInsight[] {
   const insights: PlanInsight[] = [];
   const creators = plan.creators.map((entry) => entry.creator);
+
+  // The headline number for a Maharashtra brand, and usually a surprise.
+  if (plan.regional.localShare > 0 && plan.regional.localShare < 60) {
+    insights.push({
+      severity: "critical",
+      headline: `Only ${plan.regional.localShare}% of the views you are buying land in Maharashtra`,
+      detail:
+        `${plan.reach.impressions.toLocaleString("en-IN")} views nationally, about ` +
+        `${plan.regional.localImpressions.toLocaleString("en-IN")} of them in-state. That makes the real cost ` +
+        `${inr(plan.regional.localCPM)} per thousand relevant views, not ${inr(plan.efficiency.blendedCPM)}. ` +
+        `Marathi-language creators carry far more of their audience inside the state than Mumbai creators ` +
+        `publishing in Hindi to a national following.`,
+    });
+  } else if (plan.regional.localShare >= 60) {
+    insights.push({
+      severity: "good",
+      headline: `${plan.regional.localShare}% of bought views land in Maharashtra`,
+      detail: `${inr(plan.regional.localCPM)} per thousand relevant views. A nationally-sourced plan typically wastes far more.`,
+    });
+  }
+
+  // A plan can look well funded and still leave a quarter of the state untouched.
+  const empty = plan.regional.coverage.filter((row) => row.creators === 0);
+  if (empty.length > 0 && creators.length >= 5) {
+    const missed = empty.reduce((sum, row) => sum + row.population, 0);
+    insights.push({
+      severity: "warning",
+      headline: `No creators in ${empty.map((row) => row.label).join(", ")}`,
+      detail:
+        `About ${(missed / 1_00_00_000).toFixed(1)} crore people in sub-regions this plan does not touch. ` +
+        `Maharashtra is planned by sub-region, not by city tier — ${SUB_REGIONS[empty[0].subRegion].note} is its own market.`,
+    });
+  }
+
+  // Rates and availability move with the state's own calendar, not the national one.
+  const next = upcomingFestivals(now, 120)[0];
+  if (next) {
+    const f = next.festival;
+    insights.push({
+      severity: next.bookNow ? "warning" : next.tooLate ? "info" : "info",
+      headline: next.tooLate
+        ? `${f.name} is ${next.daysAway} days away — the usual booking window has closed`
+        : `${f.name} is about ${next.daysAway} days away`,
+      detail: next.tooLate
+        ? `Good creators are typically committed ${f.bookingLeadWeeks} weeks out. Expect limited inventory and rates near ${f.rateMultiplier}x. ${f.why}`
+        : `Rates typically run about ${f.rateMultiplier}x inside the run-up and inventory is usually gone ` +
+          `${f.bookingLeadWeeks} weeks ahead, so roughly ${Math.max(0, next.daysToBook)} days to commit. ${f.why}`,
+    });
+  }
 
   // The thing a big budget most needs to hear, and the thing a shopping list never says.
   if (plan.unspent > plan.budget * 0.15) {
