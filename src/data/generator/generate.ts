@@ -767,7 +767,7 @@ function buildAuthenticity(rng: Rng, lowAuthenticity: boolean, followers: number
   if (!lowAuthenticity) {
     const score = Math.round(clampNumber(rng.normal(86, 5.5), 70, 96));
     const flags = score < 76 && rng.chance(0.35) ? ["Small follower spike after a viral reel"] : [];
-    return { score, suspiciousFollowerPct: suspiciousShare(rng, score), flags, pods: false, inactive: false };
+    return { score, dormantSubscriberPct: suspiciousShare(rng, score), flags, pods: false, inactive: false };
   }
   const score = rng.int(40, 65);
   const kinds = rng.sample(["spike", "inactive", "pods", "generic", "irregular"] as const, rng.int(1, 3));
@@ -785,7 +785,7 @@ function buildAuthenticity(rng: Rng, lowAuthenticity: boolean, followers: number
         return "Irregular follower growth over the last 90 days";
     }
   });
-  return { score, suspiciousFollowerPct: suspiciousShare(rng, score), flags, pods: kinds.includes("pods"), inactive: kinds.includes("inactive") };
+  return { score, dormantSubscriberPct: suspiciousShare(rng, score), flags, pods: kinds.includes("pods"), inactive: kinds.includes("inactive") };
 }
 
 /** Two significant figures, as people quote spikes ("18K", "1.2K"). */
@@ -969,7 +969,7 @@ function buildCreator(seed: number, slot: Slot, taken: TakenIdentities): Creator
     platforms,
     tier,
     audience: buildAudience(rng, { niches, languages, home, gender, primaryPlatform: platformList[0] }),
-    authenticity: { score: authenticity.score, suspiciousFollowerPct: authenticity.suspiciousFollowerPct, flags: authenticity.flags },
+    authenticity: { score: authenticity.score, dormantSubscriberPct: authenticity.dormantSubscriberPct, flags: authenticity.flags },
     brandSafety,
     rates: buildRates(rng, {
       tier,

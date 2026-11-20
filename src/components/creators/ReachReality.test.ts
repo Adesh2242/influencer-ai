@@ -17,7 +17,7 @@ function creator(followers: number, avgViews: number, tier: CreatorTier = "mid")
     platforms: [{ platform: "youtube", handle: `c${seq}`, followers, avgViews, engagementRate: 3, postsPerMonth: 8 }],
     tier,
     audience: {} as Creator["audience"],
-    authenticity: { score: 85, suspiciousFollowerPct: 7, flags: [] },
+    authenticity: { score: 85, dormantSubscriberPct: 7, flags: [] },
     brandSafety: { score: 80, flags: [] },
     rates: { reel: 10_000, story: 2_000, post: 5_000, video: 20_000 },
     collaborations: [],

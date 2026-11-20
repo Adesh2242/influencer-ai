@@ -22,7 +22,7 @@ function makeCreator(overrides: Partial<Creator>): Creator {
       topCities: [],
       languages: [],
     },
-    authenticity: { score: 90, suspiciousFollowerPct: 5, flags: [] },
+    authenticity: { score: 90, dormantSubscriberPct: 5, flags: [] },
     brandSafety: { score: 90, flags: [] },
     rates: { reel: 10_000, story: 4_000, post: 6_000, video: null },
     collaborations: [],

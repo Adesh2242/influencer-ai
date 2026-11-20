@@ -15,7 +15,7 @@ function creator(id: string, topics: string[], over: Partial<Creator> = {}): Cre
     platforms: [{ platform: "youtube", handle: id, followers: 50_000, avgViews: 10_000, engagementRate: 3, postsPerMonth: 8 }],
     tier: "micro",
     audience: {} as Creator["audience"],
-    authenticity: { score: 85, suspiciousFollowerPct: 7, flags: [] },
+    authenticity: { score: 85, dormantSubscriberPct: 7, flags: [] },
     brandSafety: { score: 80, flags: [] },
     rates: { reel: 5000, story: 2000, post: 3500, video: 9000 },
     collaborations: [],
@@ -155,7 +155,7 @@ describe("reachFlags", () => {
   });
 
   it("escalates on a low authenticity estimate", () => {
-    const shaky = creator("shaky", ["x"], { authenticity: { score: 40, suspiciousFollowerPct: 27, flags: ["Almost no comments"] } });
+    const shaky = creator("shaky", ["x"], { authenticity: { score: 40, dormantSubscriberPct: 27, flags: ["Almost no comments"] } });
     const flags = reachFlags(shaky);
     expect(flags.some((f) => f.severity === "critical")).toBe(true);
     expect(flags.some((f) => f.message === "Almost no comments")).toBe(true);

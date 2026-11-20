@@ -463,12 +463,16 @@ function engagementComponent(creator: Creator, context: BriefContext, estimate: 
 }
 
 function authenticityComponent(creator: Creator): ComponentResult {
-  const { score, suspiciousFollowerPct, flags } = creator.authenticity;
+  const { score, dormantSubscriberPct, flags } = creator.authenticity;
   const flagText = flags.length > 0 ? ` with ${flags.length} red flag${flags.length === 1 ? "" : "s"}` : "";
   return {
     score: Math.round(clamp(score, 0, 100)),
     applied: true,
-    detail: `Authenticity ${Math.round(score)}/100${flagText}; about ${plainPercent(Math.round(suspiciousFollowerPct))} of followers look suspicious.`,
+    detail:
+      `Authenticity ${Math.round(score)}/100${flagText}` +
+      (dormantSubscriberPct > 0
+        ? `; about ${plainPercent(Math.round(dormantSubscriberPct))} of subscribers did not watch a recent video.`
+        : "; views, subscribers and comments move together."),
     reason: score >= 85 && flags.length === 0 ? `Authenticity ${Math.round(score)}/100` : undefined,
   };
 }

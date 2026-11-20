@@ -124,8 +124,12 @@ export interface Creator {
   platforms: PlatformStats[];
   tier: CreatorTier;
   audience: AudienceProfile;
-  /** score 0-100 (higher = more authentic); suspiciousFollowerPct 0-100. */
-  authenticity: { score: number; suspiciousFollowerPct: number; flags: string[] };
+  /**
+   * score 0-100, higher is cleaner. dormantSubscriberPct is the share of subscribers who did not
+   * watch a typical recent video — arithmetic on public numbers, not a count of fake followers,
+   * and 0 where there is no shortfall worth reporting.
+   */
+  authenticity: { score: number; dormantSubscriberPct: number; flags: string[] };
   /** score 0-100 (higher = safer). */
   brandSafety: { score: number; flags: string[] };
   rates: RateCard;

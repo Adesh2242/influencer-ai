@@ -43,7 +43,7 @@ const CREATOR: Creator = {
       { code: "en", share: 0.15 },
     ],
   },
-  authenticity: { score: 91, suspiciousFollowerPct: 4.2, flags: [] },
+  authenticity: { score: 91, dormantSubscriberPct: 4.2, flags: [] },
   brandSafety: { score: 96, flags: [] },
   rates: { reel: 38_000, story: 9_000, post: 21_000, video: 55_000 },
   collaborations: [{ brand: "Kolam Kitchenware", category: "Kitchen", monthsAgo: 3 }],
@@ -141,7 +141,7 @@ describe("buildOutreachMessage", () => {
       gstRegistered: false,
       avgTurnaroundDays: Number.NaN,
       platforms: [],
-      authenticity: { score: 60, suspiciousFollowerPct: 20, flags: [] },
+      authenticity: { score: 60, dormantSubscriberPct: 20, flags: [] },
     };
     const estimate = { platform: "instagram" as const, estimatedCostINR: Number.NaN };
     for (const language of LANGUAGES) {

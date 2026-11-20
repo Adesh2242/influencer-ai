@@ -1,6 +1,7 @@
 import { CircleAlert, CircleCheck, Clock, Reply } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/Card";
 import { ScoreRing } from "@/components/ui/Score";
+import { authenticityBand, BAND_LABEL } from "@/lib/ingest/estimate";
 import { formatPercent, formatShare } from "@/lib/format";
 import type { Creator } from "@/types";
 import { plural } from "./helpers";
@@ -41,8 +42,16 @@ export function TrustSection({ creator }: { creator: Creator }) {
           <div className="min-w-0 space-y-2">
             <h3 className="text-sm font-semibold text-slate-900">Audience authenticity</h3>
             <p className="text-sm text-slate-600">
-              About <span className="font-semibold text-slate-900">{formatPercent(authenticity.suspiciousFollowerPct, 0)}</span> of
-              followers look suspicious (bots, inactive or bought).
+              {BAND_LABEL[authenticityBand(authenticity.score)]}.{" "}
+              {authenticity.dormantSubscriberPct > 0 ? (
+                <>
+                  About <span className="font-semibold text-slate-900">{formatPercent(authenticity.dormantSubscriberPct, 0)}</span> of
+                  subscribers did not watch a typical recent video. That can mean lapsed followers,
+                  a change of subject or inflated counts; it does not distinguish between them.
+                </>
+              ) : (
+                <>Views, subscribers and comments move together the way a real audience&rsquo;s do.</>
+              )}
             </p>
             <Flags flags={authenticity.flags} clean="No unusual follower patterns." />
           </div>

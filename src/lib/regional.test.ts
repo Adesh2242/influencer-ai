@@ -31,7 +31,7 @@ function creator(over: {
     ],
     tier: over.tier,
     audience: {} as Creator["audience"],
-    authenticity: { score: 85, suspiciousFollowerPct: 7, flags: [] },
+    authenticity: { score: 85, dormantSubscriberPct: 7, flags: [] },
     brandSafety: { score: 80, flags: [] },
     rates: { reel: 0, story: 0, post: 0, video: null },
     collaborations: [],

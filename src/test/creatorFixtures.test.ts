@@ -168,8 +168,8 @@ describe("demo creator dataset", () => {
     for (const { authenticity, brandSafety, id } of creators) {
       expect(authenticity.score).toBeGreaterThanOrEqual(0);
       expect(authenticity.score).toBeLessThanOrEqual(100);
-      expect(authenticity.suspiciousFollowerPct).toBeGreaterThanOrEqual(0);
-      expect(authenticity.suspiciousFollowerPct).toBeLessThanOrEqual(100);
+      expect(authenticity.dormantSubscriberPct).toBeGreaterThanOrEqual(0);
+      expect(authenticity.dormantSubscriberPct).toBeLessThanOrEqual(100);
       expect(brandSafety.score).toBeGreaterThanOrEqual(0);
       expect(brandSafety.score).toBeLessThanOrEqual(100);
       if (authenticity.score <= 65) {
@@ -183,7 +183,7 @@ describe("demo creator dataset", () => {
 
     const meanSuspicious = (pred: (score: number) => boolean) => {
       const group = creators.filter((c) => pred(c.authenticity.score));
-      return sum(group.map((c) => c.authenticity.suspiciousFollowerPct)) / group.length;
+      return sum(group.map((c) => c.authenticity.dormantSubscriberPct)) / group.length;
     };
     expect(meanSuspicious((score) => score <= 65)).toBeGreaterThan(meanSuspicious((score) => score >= 80));
   });
