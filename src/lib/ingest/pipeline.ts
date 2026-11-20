@@ -270,6 +270,13 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
   } = options;
 
   const rejections: Record<string, number> = {};
+  /** Groups one channel's failure under a stable heading, so the report stays readable. */
+  const reasonFor = (error: unknown): string => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/\b404\b/.test(message)) return "channel or uploads playlist gone (404)";
+    if (/\b403\b/.test(message)) return "channel not accessible (403)";
+    return `fetch failed: ${message.slice(0, 60)}`;
+  };
   const reject = (reason: string) => {
     rejections[reason] = (rejections[reason] ?? 0) + 1;
   };
@@ -289,20 +296,33 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
         channelIds.add(id);
       }
     } catch (error) {
-      if (!(error instanceof QuotaExceededError)) throw error;
-      quotaExhausted = true;
-      break;
+      // Quota ends the run; nothing else can be fetched after it. One query YouTube refuses costs
+      // only that query's results.
+      if (error instanceof QuotaExceededError) {
+        quotaExhausted = true;
+        break;
+      }
+      reject(`search failed: ${reasonFor(error)}`);
     }
   }
 
   // 2. Enrichment, batched 50 at a time.
-  quota.charge(Math.ceil(channelIds.size / 50) * QUOTA_COST.channels);
-  let channels: YouTubeChannel[] = [];
-  try {
-    channels = await getChannels([...channelIds]);
-  } catch (error) {
-    if (!(error instanceof QuotaExceededError)) throw error;
-    quotaExhausted = true;
+  // Batched fifty at a time by getChannels; fetch batch by batch here so one refused batch costs
+  // fifty candidates rather than every candidate found.
+  const allIds = [...channelIds];
+  const channels: YouTubeChannel[] = [];
+  for (let i = 0; i < allIds.length; i += 50) {
+    const batch = allIds.slice(i, i + 50);
+    quota.charge(QUOTA_COST.channels);
+    try {
+      channels.push(...(await getChannels(batch)));
+    } catch (error) {
+      if (error instanceof QuotaExceededError) {
+        quotaExhausted = true;
+        break;
+      }
+      reject(`channel lookup failed for ${batch.length}: ${reasonFor(error)}`);
+    }
   }
 
   const creators: SourcedCreator[] = [];
@@ -344,9 +364,16 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
       quota.charge(QUOTA_COST.videos);
       videos = await getVideos(videoIds);
     } catch (error) {
-      if (!(error instanceof QuotaExceededError)) throw error;
-      quotaExhausted = true;
-      break;
+      // Quota is the one error that ends a run: nothing further can be fetched. Anything else is
+      // about this one channel, so skip it and carry on. A creator who deletes or privatises their
+      // channel between discovery and enrichment 404s here, and rethrowing meant one dead channel
+      // destroyed an entire run of several hundred — which is exactly what happened on 20 Nov.
+      if (error instanceof QuotaExceededError) {
+        quotaExhausted = true;
+        break;
+      }
+      reject(reasonFor(error));
+      continue;
     }
 
     const window = recentVideos(videos, recentDays, now);
