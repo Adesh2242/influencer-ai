@@ -16,7 +16,7 @@ function CoverageStat({ label, value, hint }: { label: string; value: ReactNode;
   );
 }
 
-/** Live counts from the demo dataset plus the supported languages in their own scripts. */
+/** Live counts from the ingested creators plus the supported languages in their own scripts. */
 export function IndiaCoverage({ className }: { className?: string }) {
   const { creators } = useCreators();
   const coverage = useMemo(() => computeCoverage(creators), [creators]);
@@ -27,7 +27,7 @@ export function IndiaCoverage({ className }: { className?: string }) {
       <div>
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
           <Info className="size-4 text-slate-500" aria-hidden="true" />
-          In this demo dataset
+          In the database today
         </h3>
         {hasData ? (
           <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -46,7 +46,7 @@ export function IndiaCoverage({ className }: { className?: string }) {
           </dl>
         ) : (
           <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm text-slate-500">
-            Live counts appear here once the demo dataset is available in this build.
+            Counts appear here once the first ingestion run has populated the database.
           </p>
         )}
       </div>

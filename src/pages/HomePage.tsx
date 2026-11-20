@@ -38,7 +38,8 @@ const textLink =
   "font-semibold text-brand-700 underline decoration-brand-300 underline-offset-2 hover:decoration-brand-600 " +
   "focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500";
 
-const HERO_POINTS = ["No sign-up needed", "Hinglish briefs welcome", "Demo uses fictional creators"];
+// "Demo uses fictional creators" was still here after the real dataset replaced it.
+const HERO_POINTS = ["No sign-up needed", "Hinglish briefs welcome", "Real YouTube data, refreshed daily"];
 
 const FEATURES: { icon: LucideIcon; title: string; description: string; tone?: "brand" | "accent" }[] = [
   {
@@ -127,9 +128,11 @@ const FAQS: FaqItem[] = [
     question: "Is the creator data real?",
     answer: (
       <p>
-        No. Every creator in this demo is a fictional profile generated in code: the names, handles, audiences, rates and brand
-        collaborations are all invented, and none of them describes a real person or company. A production version would only use
-        data that creators consent to share, collected through official platform APIs.
+        Partly, and the line matters. Subscriber counts, views, engagement and posting cadence are
+        real, read from the YouTube Data API for public channels. Audience demographics, rate cards
+        and authenticity scores are not: YouTube keeps audience data private to the channel owner,
+        so those are modelled from measured reach and labelled as estimates wherever they appear.
+        No figure here is a quote, and no creator has agreed a price.
       </p>
     ),
   },
@@ -208,18 +211,19 @@ function Hero() {
         <div>
           <Badge tone="brand" className="px-3 py-1 text-sm">
             <Sparkles className="size-3.5" aria-hidden="true" />
-            AI creator matching for India
+Maharashtra creators, honestly costed
           </Badge>
           <h1 id="hero-title" className="mt-5 text-4xl font-extrabold tracking-tight text-balance text-slate-900 sm:text-5xl">
-            Find the <span className="text-brand-600">right creators</span> for your Indian brand in minutes
+            Two million subscribers. <span className="text-brand-600">Three thousand views.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
-            Describe your campaign in plain words and get a ranked, explainable shortlist across {LANGUAGE_COUNT} languages and tier
-            1, 2 and 3 cities, costed and planned around your budget in rupees.
+            That is a real channel in this database. Follower counts are what a creator quotes
+            against; views are what you get. We price every Maharashtra creator on what their recent
+            videos actually did, and count only the reach that lands inside the state.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <ButtonLink to="/match" size="lg">
-              Start matching
+            <ButtonLink to="/plan" size="lg">
+              See what a budget buys
               <ArrowRight className="size-4" aria-hidden="true" />
             </ButtonLink>
             <ButtonLink to="/discover" size="lg" variant="outline">

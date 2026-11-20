@@ -9,15 +9,25 @@ import {
   PLATFORM_LIST,
   REGION_LIST,
 } from "@/data/taxonomy";
+import { localReachOf, regionalValue } from "@/lib/regional";
 import type { CityTier, Creator, CreatorTier, LanguageCode, Niche, Platform, Region } from "@/types";
 
-export type DiscoverSort = "followers" | "engagement" | "authenticity" | "rate";
+export type DiscoverSort = "localReach" | "reach" | "value" | "engagement" | "followers" | "rate";
 
+/**
+ * Ordered the way a buyer should think, not the way a media kit is written.
+ *
+ * "Most followers" led this list and was the default, which sorted the catalogue by the one number
+ * the rest of the product exists to question — a 2M-subscriber channel delivering 3,510 views came
+ * first. Delivered reach inside Maharashtra leads now; followers remain available, at the bottom.
+ */
 export const DISCOVER_SORTS: readonly { value: DiscoverSort; label: string }[] = [
-  { value: "followers", label: "Most followers" },
+  { value: "localReach", label: "Most views in Maharashtra" },
+  { value: "reach", label: "Most views" },
+  { value: "value", label: "Best value per view" },
   { value: "engagement", label: "Highest engagement" },
-  { value: "authenticity", label: "Most authentic" },
   { value: "rate", label: "Lowest reel fee" },
+  { value: "followers", label: "Most followers" },
 ];
 
 export interface DiscoverQuery {
@@ -47,7 +57,7 @@ export const EMPTY_QUERY: DiscoverQuery = {
   minEr: 0,
   minAuth: 0,
   verified: false,
-  sort: "followers",
+  sort: "localReach",
 };
 
 function oneOf<T extends string | number>(raw: string | null, allowed: readonly T[]): T | null {
@@ -154,9 +164,13 @@ export function filterCreators(list: readonly Creator[], query: DiscoverQuery): 
 
 export function sortCreators(list: readonly Creator[], sort: DiscoverSort): Creator[] {
   const key: Record<DiscoverSort, (c: Creator) => number> = {
-    followers: (c) => -(primaryStats(c)?.followers ?? 0),
+    localReach: (c) => -localReachOf(c).localViews,
+    reach: (c) => -(primaryStats(c)?.avgViews ?? 0),
+    // Cheapest relevant reach first, with creators who deliver nothing in-state sent to the back
+    // rather than sorting first on a zero.
+    value: (c) => regionalValue(c, c.rates.reel).localCPM || Number.POSITIVE_INFINITY,
     engagement: (c) => -(primaryStats(c)?.engagementRate ?? 0),
-    authenticity: (c) => -c.authenticity.score,
+    followers: (c) => -(primaryStats(c)?.followers ?? 0),
     rate: (c) => c.rates.reel,
   };
   const fn = key[sort];

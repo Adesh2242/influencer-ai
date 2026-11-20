@@ -58,7 +58,7 @@ export default function DiscoverPage() {
       <PageHeader
         eyebrow="Discover"
         title="Browse creators"
-        description="Search and filter every creator in the demo dataset, no brief needed. Profiles, rates and audiences are fictional and generated for this demo."
+        description="Every Maharashtra creator in the database, no brief needed. Sorted by the views their recent videos actually delivered rather than by follower count."
         actions={
           <ButtonLink to="/match" variant="secondary">
             Match to a brief instead

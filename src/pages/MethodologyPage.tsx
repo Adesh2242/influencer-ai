@@ -138,8 +138,11 @@ const HARD_FILTERS: { icon: LucideIcon; title: string; description: ReactNode }[
 
 const LIMITATIONS: { title: string; description: string }[] = [
   {
-    title: "The data is fictional.",
-    description: "Rankings here demonstrate the method. They say nothing about real creators or real market rates.",
+    title: "Half of each profile is measured, half is estimated.",
+    description:
+      "Followers, views, engagement and cadence are what YouTube reports. Audience demographics are " +
+      "not available at any price without a vendor: YouTube keeps them private to the channel owner, " +
+      "so the age, gender and city splits here are modelled from reach and labelled as estimates.",
   },
   {
     title: "Estimates are not quotes.",
@@ -459,8 +462,11 @@ export default function MethodologyPage() {
                 identical one.
               </p>
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
-                In this demo, authenticity scores and flags are generated with the fictional profiles to show how the signals would
-                surface. They are not measurements.
+                This is a reach-consistency proxy, not an audit. Vendors score authenticity by
+                inspecting individual followers, which no free API exposes. What public figures do
+                show is whether views, subscribers and comments move together the way a real
+                audience's do, which catches crude inflation and nothing subtler. Read a high score
+                as "no visible anomaly", never as proof.
               </p>
             </Prose>
           </MethodSection>
@@ -517,11 +523,13 @@ export default function MethodologyPage() {
           <MethodSection id="data">
             <ul className="grid grid-cols-1 gap-4">
               <li>
-                <IconBlock icon={FlaskConical} title="Demo data">
+                <IconBlock icon={FlaskConical} title="Where the numbers come from">
                   <p>
-                    Every creator profile, statistic and brand collaboration in this demo is fictional, generated deterministically in
-                    code. Brand names are invented too. Nothing here describes a real person or company, and none of it is market
-                    data.
+                    Reach and engagement are read from the public YouTube Data API for creators found
+                    in Maharashtra. Audience demographics, rate cards, authenticity and the
+                    Maharashtra audience share are modelled from that reach and marked as estimates.
+                    Past brand collaborations are not available from any free source and are not
+                    shown. None of this is market data or a price anyone has agreed.
                   </p>
                 </IconBlock>
               </li>

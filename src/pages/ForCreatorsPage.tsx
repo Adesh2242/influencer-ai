@@ -140,7 +140,7 @@ export default function ForCreatorsPage() {
           id="plan-title"
           eyebrow="What's planned"
           title="How creator sign-up will work"
-          description="The current demo uses fictional profiles. Here's how real creators will join once sign-up opens."
+          description="Creators are currently found automatically from public YouTube data. Here's how you can claim and correct your profile once sign-up opens."
           align="center"
         />
         <ol className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-3">

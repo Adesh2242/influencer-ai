@@ -8,8 +8,10 @@ import { formatCount, formatINRCompact, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { LanguageCode, Platform } from "@/types";
 
-// A static illustration of the matching UI. The people are invented and deliberately shown with
-// initials only; nothing here is read from the demo dataset, so it renders even when that is empty.
+// A static illustration of the matching UI, sitting beside a headline about Maharashtra. It used
+// to show a Tamil Nadu and Andhra brief with creators in Coimbatore and Vijayawada, which sold a
+// different product than the sentence next to it. The people are invented and shown with initials
+// only; nothing here is read from the database, so it renders even when that is empty.
 
 interface ExampleMatch {
   name: string;
@@ -25,43 +27,42 @@ interface ExampleMatch {
 }
 
 const EXAMPLE_BRIEF =
-  "Launching a millet snack in Tamil Nadu and Andhra. Need 8 food creators for Insta reels in Tamil and Telugu, mostly tier 2 cities. Budget ₹6 lakh.";
+  "Launching a ready-to-eat misal pack across Maharashtra. Need 8 Marathi food creators for reels, Pune and Nashik belt, nothing from Mumbai. Budget ₹6 lakh.";
 
 const EXAMPLE_FILTERS = [
   NICHE_LABELS.food,
-  LANGUAGES.ta.label,
-  LANGUAGES.te.label,
+  LANGUAGES.mr.label,
   CITY_TIER_LABELS[2],
-  PLATFORMS.instagram.label,
+  PLATFORMS.youtube.label,
   DELIVERABLES.reel.label,
   `${formatINRCompact(600_000)} budget`,
 ];
 
 const EXAMPLE_MATCHES: ExampleMatch[] = [
   {
-    name: "Kavya R.",
+    name: "Snehal J.",
     avatarHue: 24,
-    cityId: "coimbatore",
-    language: "ta",
-    platform: "instagram",
+    cityId: "nashik",
+    language: "mr",
+    platform: "youtube",
     followers: 48_200,
     score: 91,
     reasons: [
-      "Tamil food reels with a mostly South Indian audience",
+      "Marathi food reels, an estimated 91% of the audience inside Maharashtra",
       `${formatPercent(4.9)} engagement vs ${formatPercent(CREATOR_TIERS.micro.engagementBenchmark)} for micro creators`,
     ],
     costINR: 28_000,
     views: 61_000,
   },
   {
-    name: "Teja K.",
+    name: "Rutuja P.",
     avatarHue: 265,
-    cityId: "vijayawada",
-    language: "te",
-    platform: "instagram",
+    cityId: "pune",
+    language: "mr",
+    platform: "youtube",
     followers: 72_500,
     score: 78,
-    reasons: ["Telugu home-cooking creator, audience mostly in tier 2 and 3 cities", "High audience authenticity, no competitor work"],
+    reasons: ["Marathi home-cooking creator, audience mostly in tier 2 and 3 cities", "Views track subscribers; no reach anomalies"],
     costINR: 35_000,
     views: 84_000,
   },

@@ -110,8 +110,9 @@ function SiteFooter() {
       </div>
       <div className="border-t border-slate-100">
         <p className="container-page py-4 text-xs text-slate-500">
-          Demo build: every creator profile, statistic and brand collaboration shown here is fictional sample data generated for
-          demonstration. © {new Date().getFullYear()} {SITE.name}.
+          Subscriber counts, views, engagement and posting cadence come from the YouTube Data API.
+          Audience demographics, rate cards and authenticity are estimates derived from that reach,
+          not observations. © {new Date().getFullYear()} {SITE.name}.
         </p>
       </div>
     </footer>

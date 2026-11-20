@@ -91,8 +91,12 @@ function CreatorProfile({ creator, pool }: { creator: Creator; pool: Creator[] }
 
       <SimilarCreators creator={creator} similar={similar} />
 
-      <p className="text-xs text-slate-500">
-        Demo profile: {creator.name} is a fictional creator, and every figure on this page is generated sample data.
+      <p className="text-xs leading-relaxed text-slate-500">
+        Followers, views, engagement and posting cadence for {creator.name} are read from the public
+        YouTube Data API. Audience demographics, the rate card, the authenticity estimate and the
+        Maharashtra share are modelled from that reach, not observed, and are estimates rather than
+        statements about this creator. Nothing here is a quote or an agreed price. Creators can ask
+        for a profile to be corrected or removed.
       </p>
     </div>
   );

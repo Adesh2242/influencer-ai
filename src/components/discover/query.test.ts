@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { creators } from "@/test/creatorFixtures";
 import { getCity } from "@/data/taxonomy";
-import { activeFilterCount, EMPTY_QUERY, filterCreators, parseDiscoverQuery, sortCreators, toSearchParams } from "./query";
+import { activeFilterCount, DISCOVER_SORTS, EMPTY_QUERY, filterCreators, parseDiscoverQuery, sortCreators, toSearchParams } from "./query";
 
 describe("discover URL params", () => {
   it("round-trips a query and drops defaults", () => {
@@ -44,5 +44,30 @@ describe("filterCreators and sortCreators", () => {
     expect(byRate.every((v, i) => i === 0 || byRate[i - 1] <= v)).toBe(true);
     const byFollowers = sortCreators(creators, "followers").map((c) => c.platforms[0].followers);
     expect(byFollowers.every((v, i) => i === 0 || byFollowers[i - 1] >= v)).toBe(true);
+  });
+});
+
+describe("sorting a buyer can trust", () => {
+  it("defaults to delivered reach in Maharashtra, not follower count", () => {
+    expect(EMPTY_QUERY.sort).toBe("localReach");
+    expect(DISCOVER_SORTS[0].value).toBe("localReach");
+  });
+
+  it("still offers followers, but not first", () => {
+    const values = DISCOVER_SORTS.map((s) => s.value);
+    expect(values).toContain("followers");
+    expect(values.indexOf("followers")).toBeGreaterThan(values.indexOf("localReach"));
+  });
+
+  it("ranks a hollow channel below a smaller one that delivers", () => {
+    const hollow = { ...creators[0], id: "hollow", tier: "mega" as const, languages: ["en" as const] };
+    hollow.platforms = [{ platform: "youtube", handle: "h", followers: 2_010_000, avgViews: 3_510, engagementRate: 0.9, postsPerMonth: 4 }];
+    const solid = { ...creators[0], id: "solid", tier: "mid" as const, languages: ["mr" as const, "hi" as const] };
+    solid.platforms = [{ platform: "youtube", handle: "s", followers: 150_000, avgViews: 40_000, engagementRate: 4, postsPerMonth: 8 }];
+
+    const byLocal = sortCreators([hollow, solid], "localReach");
+    expect(byLocal[0].id).toBe("solid");
+    // The old default would have put the hollow channel first.
+    expect(sortCreators([hollow, solid], "followers")[0].id).toBe("hollow");
   });
 });
