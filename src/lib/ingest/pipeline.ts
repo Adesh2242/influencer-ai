@@ -44,6 +44,12 @@ export interface SourcedCreator {
 
 const CONFIDENCE_RANK: Record<LocationConfidence, number> = { none: 0, weak: 1, likely: 2, strong: 3 };
 
+/** A channel silent longer than this is not sellable inventory, whatever its back catalogue did. */
+export const DORMANT_AFTER_DAYS = 365;
+
+/** Below this, a median is noise rather than a forecast — two videos have no middle worth trusting. */
+export const MIN_SAMPLE_FOR_PRICING = 3;
+
 /**
  * Discovery seeds. A bare language query is useless here: searching YouTube for "Marathi" returns
  * broadcasters and news desks (Zee Marathi, TV9 Marathi, Maharashtra Times), not the creators a
@@ -376,10 +382,21 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
       continue;
     }
 
+    // No fallback to the full history. That fallback existed to rescue thin channels and instead
+    // priced dead ones on their past: a channel with two videos, both from 2021, was valued on a
+    // five-year-old viral hit at ₹83 lakh a reel. A channel that has stopped posting is not
+    // inventory a brand can buy, however well it once did.
+    const lastUpload = Math.max(...videos.map((v) => Date.parse(v.publishedAt)).filter(Number.isFinite), 0);
+    const dormantDays = Math.round((now - lastUpload) / 86_400_000);
+    if (!Number.isFinite(lastUpload) || lastUpload === 0 || dormantDays > DORMANT_AFTER_DAYS) {
+      reject(`dormant: nothing posted in ${Math.min(dormantDays, 9999)} days`);
+      continue;
+    }
+
     const window = recentVideos(videos, recentDays, now);
-    const metrics = computeMetrics(window.length >= 3 ? window : videos, now);
-    if (metrics.sampleSize === 0) {
-      reject("no usable recent videos");
+    const metrics = computeMetrics(window, now);
+    if (metrics.sampleSize < MIN_SAMPLE_FOR_PRICING) {
+      reject(`only ${metrics.sampleSize} video(s) in the last ${recentDays} days`);
       continue;
     }
 

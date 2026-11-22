@@ -76,6 +76,40 @@ export function authenticityMultiplier(score: number): number {
 }
 
 /**
+ * Share of subscribers who can be expected to watch a given post. Generous: half an audience
+ * turning up for one video is a very good channel.
+ */
+export const OWNED_SHARE = 0.5;
+
+/**
+ * How much of a creator's algorithmic reach counts towards a fee. Views far above subscriber count
+ * come from YouTube's recommendations, not from an audience the creator brings — and the algorithm
+ * decides that again for every post, with branded content typically faring worse than organic. Real
+ * reach, so not worth nothing; not promised reach, so not worth full price.
+ */
+export const BORROWED_RATE = 0.2;
+
+/**
+ * Reach a creator could credibly commit to for a paid post, rather than whatever their best video
+ * happened to do. A channel with 28,800 subscribers and a 27-million-view hit from 2021 was being
+ * priced on the hit, at ₹83 lakh a reel.
+ */
+export function sellableReach(views: number, followers: number): number {
+  if (views <= 0) return 0;
+  const owned = Math.min(views, followers * OWNED_SHARE);
+  const borrowed = Math.max(0, views - owned);
+  return Math.round(owned + borrowed * BORROWED_RATE);
+}
+
+/**
+ * Ceiling on fair value, as a multiple of what a creator of this size would ask. A genuine
+ * overperformer is worth more than their tier suggests; nobody is worth a hundred times it, and a
+ * number that far outside the market is a modelling error rather than a bargain.
+ */
+export const FAIR_VALUE_CEILING = 3;
+
+
+/**
  * Rupee fees are quoted in round numbers, coarser as they get larger. The floor is per-format so
  * the card keeps its order: rounding a story and a post to the same ₹500 made post < story false.
  */
@@ -153,18 +187,26 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
   const tier = creator.tier;
 
   const cpm = CPM_BY_TIER[tier] * FORMAT_MULTIPLIER[deliverable];
-  const base = (views / 1000) * cpm;
+  const sellable = sellableReach(views, followers);
+  const base = (sellable / 1000) * cpm;
   const engagement = engagementMultiplier(platform?.engagementRate ?? 0, tier);
   const authenticity = authenticityMultiplier(creator.authenticity.score);
-  const fairValue = roundFee(base * engagement * authenticity, deliverable);
   const ask = likelyAsk(followers, tier, deliverable);
+  const modelled = base * engagement * authenticity;
+  // The ceiling is a sanity check on the model, not on the creator.
+  const capped = Math.min(modelled, ask * FAIR_VALUE_CEILING);
+  const fairValue = roundFee(capped, deliverable);
   const gap = fairValue > 0 ? ask / fairValue : Infinity;
 
   const workings: RateWorking[] = [
     {
-      label: "Delivered reach",
+      label: "Sellable reach",
       value: Math.round(base),
-      detail: `${views.toLocaleString("en-IN")} median views × ₹${Math.round(cpm).toLocaleString("en-IN")} per 1,000`,
+      detail:
+        sellable < views
+          ? `${views.toLocaleString("en-IN")} median views, of which ${sellable.toLocaleString("en-IN")} is reach they can commit to ` +
+            `(${followers.toLocaleString("en-IN")} subscribers; the rest is algorithmic) × ₹${Math.round(cpm).toLocaleString("en-IN")} per 1,000`
+          : `${views.toLocaleString("en-IN")} median views × ₹${Math.round(cpm).toLocaleString("en-IN")} per 1,000`,
     },
     {
       label: "Engagement",
@@ -178,8 +220,19 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
     },
   ];
 
+  if (capped < modelled) {
+    workings.push({
+      label: "Capped",
+      value: fairValue,
+      detail: `Held to ${FAIR_VALUE_CEILING}× what a ${tier} creator of this size would ask (₹${ask.toLocaleString("en-IN")}).`,
+    });
+  }
+
+  // A capped figure is a ceiling the model refused to go above, not a valuation. Calling it
+  // "underpriced" would read as a bargain and invite a buyer to overpay for reach that was
+  // discounted precisely because it cannot be promised.
   const verdict: RateEstimate["verdict"] =
-    gap >= 4 ? "overpriced" : gap >= 2 ? "stretched" : gap >= 0.8 ? "fair" : "underpriced";
+    gap >= 4 ? "overpriced" : gap >= 2 ? "stretched" : gap >= 0.8 || capped < modelled ? "fair" : "underpriced";
 
   const effectiveCPM = views > 0 ? Math.round((fairValue / views) * 1000) : 0;
 
@@ -190,7 +243,9 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
         ? `The quote will be anchored to ${followers.toLocaleString("en-IN")} subscribers; the reach supports about ₹${fairValue.toLocaleString("en-IN")}. There is room to negotiate down.`
         : verdict === "underpriced"
           ? `Delivers ${views.toLocaleString("en-IN")} views for a tier that usually asks less. Good value — book before the rate card catches up.`
-          : `Ask and delivered reach line up. ₹${fairValue.toLocaleString("en-IN")} is a fair opening number.`;
+          : capped < modelled
+            ? `Recent views are far above what ${followers.toLocaleString("en-IN")} subscribers can account for, so most of that reach is YouTube's recommendation engine rather than an audience they bring. ₹${fairValue.toLocaleString("en-IN")} is what the reach they can commit to is worth; treat anything above it as a bet on the algorithm repeating itself.`
+            : `Ask and delivered reach line up. ₹${fairValue.toLocaleString("en-IN")} is a fair opening number.`;
 
   return { fairValue, likelyAsk: ask, gap: Number(gap.toFixed(2)), verdict, effectiveCPM, workings, negotiationNote: note };
 }

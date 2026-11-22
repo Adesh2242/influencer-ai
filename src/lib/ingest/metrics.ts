@@ -12,6 +12,10 @@ export interface ChannelMetrics {
   sampleSize: number;
   /** True when the channel hides likes, so engagement counts comments only and reads low. */
   likesHidden: boolean;
+  /** Days since the most recent upload in the sample. A channel that stopped is not inventory. */
+  daysSinceLastUpload: number;
+  /** Spread of the sample: max/median views. A huge value means one video carried the average. */
+  viewSpread: number;
 }
 
 /**
@@ -38,7 +42,15 @@ export function recentVideos(videos: YouTubeVideo[], days: number, now = Date.no
 export function computeMetrics(videos: YouTubeVideo[], now = Date.now()): ChannelMetrics {
   const usable = videos.filter((video) => video.viewCount > 0);
   if (usable.length === 0) {
-    return { avgViews: 0, engagementRate: 0, postsPerMonth: 0, sampleSize: 0, likesHidden: false };
+    return {
+      avgViews: 0,
+      engagementRate: 0,
+      postsPerMonth: 0,
+      sampleSize: 0,
+      likesHidden: false,
+      daysSinceLastUpload: Number.POSITIVE_INFINITY,
+      viewSpread: 0,
+    };
   }
 
   const likesHidden = usable.every((video) => video.likeCount === null);
@@ -54,8 +66,16 @@ export function computeMetrics(videos: YouTubeVideo[], now = Date.now()): Channe
   const oldest = Math.min(...times);
   const spanMonths = Math.max(0.5, (now - oldest) / (30 * 24 * 60 * 60 * 1000));
 
+  const newest = Math.max(...times);
+  const medianViews = median(usable.map((video) => video.viewCount));
+  const maxViews = Math.max(...usable.map((video) => video.viewCount));
+
   return {
-    avgViews: Math.round(median(usable.map((video) => video.viewCount))),
+    daysSinceLastUpload: Math.max(0, Math.round((now - newest) / 86_400_000)),
+    // One viral video among duds gives a huge spread, which is a warning that the central figure
+    // is not a reliable forecast of the next post.
+    viewSpread: medianViews > 0 ? Number((maxViews / medianViews).toFixed(1)) : 0,
+    avgViews: Math.round(medianViews),
     engagementRate: Number(median(engagementRates).toFixed(2)),
     postsPerMonth: Number((usable.length / spanMonths).toFixed(1)),
     sampleSize: usable.length,

@@ -3,7 +3,16 @@ import { authenticityBand, BAND_LABEL, estimateAuthenticity } from "./estimate";
 import type { ChannelMetrics } from "./metrics";
 
 function metrics(over: Partial<ChannelMetrics> = {}): ChannelMetrics {
-  return { avgViews: 50_000, engagementRate: 3.5, postsPerMonth: 6, sampleSize: 12, likesHidden: false, ...over };
+  return {
+    avgViews: 50_000,
+    engagementRate: 3.5,
+    postsPerMonth: 6,
+    sampleSize: 12,
+    likesHidden: false,
+    daysSinceLastUpload: 7,
+    viewSpread: 1.4,
+    ...over,
+  };
 }
 
 describe("estimateAuthenticity", () => {
@@ -48,7 +57,7 @@ describe("estimateAuthenticity", () => {
  * followers, about a real named person, on no evidence at all.
  */
 describe("score calibration", () => {
-  const clean = { avgViews: 60_000, engagementRate: 4, postsPerMonth: 8, sampleSize: 20, likesHidden: false };
+  const clean = metrics({ avgViews: 60_000, engagementRate: 4, postsPerMonth: 8, sampleSize: 20 });
 
   it("lets a clean channel with strong reach reach the top of the scale", () => {
     const result = estimateAuthenticity({ ...clean, avgViews: 400_000 }, 1_000_000, 0.12);
@@ -65,7 +74,7 @@ describe("score calibration", () => {
   it("spans a wide range, so the number discriminates", () => {
     const best = estimateAuthenticity({ ...clean, avgViews: 400_000 }, 1_000_000, 0.12).score;
     const worst = estimateAuthenticity(
-      { avgViews: 1_000, engagementRate: 0.1, postsPerMonth: 1, sampleSize: 2, likesHidden: false },
+      metrics({ avgViews: 1_000, engagementRate: 0.1, postsPerMonth: 1, sampleSize: 2 }),
       2_000_000,
       0,
     ).score;
@@ -75,7 +84,7 @@ describe("score calibration", () => {
   it("reports dormant subscribers only where the shortfall is real, and as what it is", () => {
     // 2.01M subscribers, 3,510 median views.
     const hollow = estimateAuthenticity(
-      { avgViews: 3_510, engagementRate: 0.9, postsPerMonth: 5, sampleSize: 20, likesHidden: false },
+      metrics({ avgViews: 3_510, engagementRate: 0.9, postsPerMonth: 5, sampleSize: 20 }),
       2_010_000,
       0.0001,
     );
