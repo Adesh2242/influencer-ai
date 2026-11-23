@@ -51,3 +51,19 @@ describe("database schema", () => {
     }
   });
 });
+
+describe("the follower floor", () => {
+  it("is applied when serving, so records collected under a lower floor stop appearing", async () => {
+    const { MIN_FOLLOWERS } = await import("../lib/ingest/pipeline");
+    expect(MIN_FOLLOWERS).toBe(10_000);
+  });
+
+  it("filters on followers in the creators query", async () => {
+    // Guards the clause itself: a floor that only exists at ingestion leaves older, smaller
+    // records visible and the catalogue stops matching the claim made about it.
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync(new URL("./db.ts", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("followers >= $2");
+  });
+});

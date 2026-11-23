@@ -9,6 +9,7 @@ import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { handleParseBrief } from "./netlify/lib/parse-brief-handler";
+import { MIN_FOLLOWERS } from "./src/lib/ingest/pipeline";
 import { findLookalikes, growthFrom, topicCoOccurrence } from "./src/lib/analytics";
 import { buildMediaPlan } from "./src/lib/mediaplan";
 import { estimateRate } from "./src/lib/pricing";
@@ -318,7 +319,9 @@ if (process.env.NODE_ENV !== "test") {
   const ready = hasDatabase()
     ? migrate()
         .then(countCreators)
-        .then((count) => console.log(`database ready, ${count} creators stored`))
+        .then(({ total, served }) =>
+          console.log(`database ready, ${served} creators served of ${total} stored (floor ${MIN_FOLLOWERS} followers)`),
+        )
         .catch((error: unknown) => console.error("database setup failed, continuing without it:", error))
     : Promise.resolve(console.log("no DATABASE_URL set, running without a creator database"));
 

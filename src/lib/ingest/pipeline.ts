@@ -51,6 +51,14 @@ export const DORMANT_AFTER_DAYS = 365;
 export const MIN_SAMPLE_FOR_PRICING = 3;
 
 /**
+ * Smallest channel worth collecting. Below roughly ten thousand subscribers a channel is hard to
+ * price and harder to verify: the engagement benchmarks swing wildly, one quiet month looks like
+ * a collapse, and the reach a brand gets is small enough that the briefing cost outweighs it.
+ * Applied both when ingesting and when serving, so the catalogue matches the claim.
+ */
+export const MIN_FOLLOWERS = 10_000;
+
+/**
  * Discovery seeds. A bare language query is useless here: searching YouTube for "Marathi" returns
  * broadcasters and news desks (Zee Marathi, TV9 Marathi, Maharashtra Times), not the creators a
  * brand shortlists. Pairing a niche with a place or with Marathi words surfaces individuals.
@@ -268,7 +276,7 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
     seedOffset = 0,
     queries = buildSeedQueries(options.maxQueries ?? 40, seedOffset),
     maxCreators = 200,
-    minSubscribers = 1_000,
+    minSubscribers = MIN_FOLLOWERS,
     minConfidence = "likely",
     recentDays = 180,
     quota = new QuotaMeter(),

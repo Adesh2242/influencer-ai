@@ -100,3 +100,27 @@ describe("one bad channel does not end the run", () => {
     expect(Object.keys(report.rejections).some((k) => k.startsWith("channel lookup failed"))).toBe(true);
   });
 });
+
+describe("the follower floor at ingestion", () => {
+  it("rejects a channel below the floor and says which floor", async () => {
+    const small = { ...channel("small"), subscriberCount: 4_000 };
+    vi.spyOn(youtube, "searchChannels").mockResolvedValue(["small"]);
+    vi.spyOn(youtube, "getChannels").mockResolvedValue([small]);
+
+    const report = await ingestMaharashtra({ maxQueries: 1 });
+
+    expect(report.creators).toHaveLength(0);
+    expect(report.rejections["under 10000 subscribers"]).toBe(1);
+  });
+
+  it("keeps a channel on the line", async () => {
+    const onLine = { ...channel("ten"), subscriberCount: 10_000 };
+    vi.spyOn(youtube, "searchChannels").mockResolvedValue(["ten"]);
+    vi.spyOn(youtube, "getChannels").mockResolvedValue([onLine]);
+    vi.spyOn(youtube, "getRecentVideoIds").mockResolvedValue(["v1", "v2", "v3", "v4", "v5"]);
+    vi.spyOn(youtube, "getVideos").mockImplementation(async (ids: string[]) => ids.map(video));
+
+    const report = await ingestMaharashtra({ maxQueries: 1 });
+    expect(report.creators).toHaveLength(1);
+  });
+});

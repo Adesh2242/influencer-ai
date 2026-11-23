@@ -13,7 +13,7 @@
 // exactly this reason.
 import { writeFile } from "node:fs/promises";
 import { closePool, migrate, recordIngestRun, upsertCreators } from "../src/server/db";
-import { ingestMaharashtra } from "../src/lib/ingest/pipeline";
+import { ingestMaharashtra, MIN_FOLLOWERS } from "../src/lib/ingest/pipeline";
 import { MissingKeyError, QuotaExceededError, QuotaMeter } from "../src/lib/ingest/youtube";
 import type { LocationConfidence } from "../src/lib/ingest/location";
 
@@ -25,7 +25,7 @@ function arg(name: string, fallback?: string): string | undefined {
 async function main(): Promise<void> {
   const out = arg("out");
   const maxCreators = Number(arg("max", "800"));
-  const minSubscribers = Number(arg("min-subs", "500"));
+  const minSubscribers = Number(arg("min-subs", String(MIN_FOLLOWERS)));
   const maxQueries = Number(arg("queries", "80"));
   // Rotate the seed queries by the day, so a daily job explores new ground each run instead of
   // rediscovering the same channels. --offset overrides it for a manual backfill.

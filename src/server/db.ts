@@ -7,6 +7,7 @@
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
 import { wellFormedDeep } from "../lib/text";
+import { MIN_FOLLOWERS } from "../lib/ingest/pipeline";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
 
 let pool: Pool | undefined;
@@ -201,6 +202,12 @@ export async function upsertCreators(records: SourcedCreator[]): Promise<UpsertR
 export interface CreatorQuery {
   /** Drop creators we are less sure about than this. */
   minConfidence?: "strong" | "likely" | "weak";
+  /**
+   * Smallest channel to return. Defaults to the ingestion floor so records collected under an
+   * earlier, lower floor stop appearing without being deleted — raising the bar is reversible,
+   * dropping rows is not.
+   */
+  minFollowers?: number;
   cityId?: string;
   /** Only creators who use this hashtag or video tag. */
   topic?: string;
@@ -215,8 +222,8 @@ const CONFIDENCE_SETS: Record<string, string[]> = {
 
 export async function listCreators(query: CreatorQuery = {}): Promise<SourcedCreator[]> {
   const allowed = CONFIDENCE_SETS[query.minConfidence ?? "likely"];
-  const params: unknown[] = [allowed];
-  let sql = "select record from creators where location_confidence = any($1)";
+  const params: unknown[] = [allowed, query.minFollowers ?? MIN_FOLLOWERS];
+  let sql = "select record from creators where location_confidence = any($1) and followers >= $2";
   if (query.cityId) {
     params.push(query.cityId);
     sql += ` and city_id = $${params.length}`;
@@ -271,9 +278,12 @@ export async function getCreator(id: string): Promise<SourcedCreator | undefined
   return rows[0]?.record;
 }
 
-export async function countCreators(): Promise<number> {
-  const { rows } = await getPool().query<{ count: string }>("select count(*)::text as count from creators");
-  return Number(rows[0]?.count ?? 0);
+export async function countCreators(): Promise<{ total: number; served: number }> {
+  const { rows } = await getPool().query<{ total: string; served: string }>(
+    "select count(*)::text as total, count(*) filter (where followers >= $1)::text as served from creators",
+    [MIN_FOLLOWERS],
+  );
+  return { total: Number(rows[0]?.total ?? 0), served: Number(rows[0]?.served ?? 0) };
 }
 
 export async function insertFormSubmission(formName: string, fields: Record<string, string>): Promise<void> {
