@@ -4,21 +4,21 @@ import { parseBriefWithRules } from "./rules";
 const parse = (text: string) => parseBriefWithRules(text).brief;
 
 describe("parseBriefWithRules: realistic briefs", () => {
-  it("reads a South India skincare launch", () => {
+  it("reads a Western Maharashtra skincare launch", () => {
     const result = parseBriefWithRules(
-      "We are Glowleaf Naturals, launching a vitamin C serum for women 18-34 in South India. Tamil, Telugu, Kannada and Malayalam creators on Instagram reels. Budget ₹3 lakh for 8 micro-influencers. No fake followers please. Avoid creators who worked with Dewdrop Botanics in the last 6 months.",
+      "We are Glowleaf Naturals, launching a vitamin C serum for women 18-34 in Western Maharashtra. Marathi creators on Instagram reels. Budget ₹3 lakh for 8 micro-influencers. No fake followers please. Avoid creators who worked with Dewdrop Botanics in the last 6 months.",
     );
     expect(result.source).toBe("rules");
     expect(result.brief).toMatchObject({
       brandName: "Glowleaf Naturals",
       productCategory: "serum",
       niches: ["beauty"],
-      languages: ["ta", "te", "kn", "ml"],
+      languages: ["mr"],
       platforms: ["instagram"],
       deliverable: "reel",
       targetGender: "female",
       targetAges: ["18-24", "25-34"],
-      targetRegions: ["south"],
+      targetRegions: ["western"],
       creatorTiers: ["micro"],
       budgetINR: 300_000,
       creatorsWanted: 8,
@@ -29,9 +29,9 @@ describe("parseBriefWithRules: realistic briefs", () => {
     expect(result.detectedFields).not.toContain("description");
   });
 
-  it("reads a Hinglish fintech brief for the Hindi belt", () => {
+  it("reads a Hinglish fintech brief for Vidarbha", () => {
     const result = parseBriefWithRules(
-      "PaisaPilot UPI app ke liye Hindi belt mein tier 2 aur tier 3 cities ke 20 creators chahiye. Goal: app installs. Budget 5L. Gen Z and millennials, Hinglish content, Moj and ShareChat bhi chalega.",
+      "PaisaPilot UPI app ke liye Vidarbha mein tier 2 aur tier 3 cities ke 20 creators chahiye. Goal: app installs. Budget 5L. Gen Z and millennials, Hinglish content, Moj and ShareChat bhi chalega.",
     );
     expect(result.brief).toMatchObject({
       niches: ["finance"],
@@ -39,7 +39,7 @@ describe("parseBriefWithRules: realistic briefs", () => {
       languages: ["hi", "en"],
       platforms: ["moj", "sharechat"],
       targetTiers: [2, 3],
-      targetRegions: ["north", "central"],
+      targetRegions: ["vidarbha"],
       targetAges: ["18-24", "25-34", "35-44"],
       budgetINR: 500_000,
       creatorsWanted: 20,
@@ -47,22 +47,30 @@ describe("parseBriefWithRules: realistic briefs", () => {
     expect(result.notes.join(" ")).toMatch(/Hinglish/);
   });
 
-  it("suggests Hindi for the Hindi belt when no language is given", () => {
-    const result = parseBriefWithRules("Credit card awareness campaign across the hindi heartland, 10 creators");
-    expect(result.brief.targetRegions).toEqual(["north", "central"]);
-    expect(result.brief.languages).toEqual(["hi"]);
-    expect(result.notes.join(" ")).toMatch(/Suggested Hindi/);
+  it("suggests Marathi outside the Mumbai belt when no language is given", () => {
+    // The useful default in a Maharashtra catalogue: a Marathwada brief wants Marathi creators,
+    // and saying so beats silently matching whatever language happens to rank.
+    const result = parseBriefWithRules("Credit card awareness campaign across Marathwada, 10 creators");
+    expect(result.brief.targetRegions).toEqual(["marathwada"]);
+    expect(result.brief.languages).toEqual(["mr"]);
+    expect(result.notes.join(" ")).toMatch(/Suggested Marathi/);
+  });
+
+  it("does not suggest Marathi for a Mumbai brief, where Hindi and English carry", () => {
+    const result = parseBriefWithRules("Awareness campaign across the Mumbai Metropolitan Region, 10 creators");
+    expect(result.brief.targetRegions).toEqual(["mumbai_metro"]);
+    expect(result.brief.languages).toBeUndefined();
   });
 
   it("reads a festive snack brief with a per-creator fee and competitors", () => {
     const result = parseBriefWithRules(
-      "Diwali campaign for Crunchwala namkeen in Maharashtra and Gujarat. 15 food creators, ₹20k per creator, reels + stories, Marathi and Gujarati. Competitors: SnackSutra, Masala Munch.",
+      "Diwali campaign for Crunchwala namkeen in Marathwada and Vidarbha. 15 food creators, ₹20k per creator, reels + stories, Marathi. Competitors: SnackSutra, Masala Munch.",
     );
     expect(result.brief).toMatchObject({
       brandName: "Crunchwala",
       niches: ["food"],
-      targetRegions: ["west"],
-      languages: ["mr", "gu"],
+      targetRegions: ["vidarbha", "marathwada"],
+      languages: ["mr"],
       deliverable: "reel",
       creatorsWanted: 15,
       budgetINR: 300_000,
@@ -75,12 +83,12 @@ describe("parseBriefWithRules: realistic briefs", () => {
   it("reads an EV test-drive brief with cities and an engagement floor", () => {
     expect(
       parse(
-        "EV scooter test-drive drive for VoltRide in Bengaluru, Pune and Hyderabad. Men 25-44, working professionals. INR 12 lakh, a dozen creators, Instagram reels. Engagement rate above 3%.",
+        "EV scooter test-drive drive for VoltRide in Nashik, Pune and Nagpur. Men 25-44, working professionals. INR 12 lakh, a dozen creators, Instagram reels. Engagement rate above 3%.",
       ),
     ).toMatchObject({
       brandName: "VoltRide",
       niches: ["automotive"],
-      targetCityIds: ["bengaluru", "pune", "hyderabad"],
+      targetCityIds: ["nashik", "pune", "nagpur"],
       targetGender: "male",
       targetAges: ["25-34", "35-44"],
       budgetINR: 1_200_000,
@@ -142,15 +150,15 @@ describe("parseBriefWithRules: realistic briefs", () => {
     expect(result.notes.join(" ")).toMatch(/Pan-India/);
   });
 
-  it("reads a Kolkata Durga Puja fashion brief in Bengali", () => {
+  it("reads a Ganeshotsav fashion brief in Marathi", () => {
     expect(
       parse(
-        "Durga Puja ethnic wear collection by Tantbari Looms. Bengali creators in Kolkata and Siliguri, sarees and kurtas, carousel posts on Instagram, budget Rs. 2,50,000, 10 creators.",
+        "Ganeshotsav ethnic wear collection by Tantbari Looms. Marathi creators in Nagpur and Nanded, sarees and kurtas, carousel posts on Instagram, budget Rs. 2,50,000, 10 creators.",
       ),
     ).toMatchObject({
       niches: ["fashion"],
-      languages: ["bn"],
-      targetCityIds: ["kolkata", "siliguri"],
+      languages: ["mr"],
+      targetCityIds: ["nagpur", "nanded"],
       deliverable: "post",
       platforms: ["instagram"],
       budgetINR: 250_000,
@@ -172,19 +180,22 @@ describe("parseBriefWithRules: realistic briefs", () => {
     });
   });
 
-  it("reads Hindi script and state abbreviations", () => {
-    const brief = parse("हिंदी creators chahiye UP aur MP ke liye, kisan tractor brand, 8 lakh ka budget, 12 creators");
-    expect(brief.languages).toEqual(["hi"]);
-    expect(brief.targetRegions).toEqual(expect.arrayContaining(["north", "central"]));
+  it("reads Devanagari and district names", () => {
+    const brief = parse("मराठी creators chahiye Jalgaon aur Beed ke liye, kisan tractor brand, 8 lakh ka budget, 12 creators");
+    expect(brief.languages).toEqual(["mr"]);
+    expect(brief.targetRegions).toEqual(expect.arrayContaining(["north", "marathwada"]));
     expect(brief.niches).toContain("agriculture");
     expect(brief.budgetINR).toBe(800_000);
     expect(brief.creatorsWanted).toBe(12);
   });
 
-  it("does not read Tamil Nadu as a language request", () => {
-    const brief = parse("Filter coffee brand looking for food creators in Tamil Nadu and Kerala, tier-2/3 towns");
-    expect(brief.languages).toBeUndefined();
-    expect(brief.targetRegions).toEqual(["south"]);
+  it("suggests Marathi for a district brief rather than reading it from the district name", () => {
+    const result = parseBriefWithRules("Filter coffee brand looking for food creators in Latur and Beed, tier-2/3 towns");
+    const brief = result.brief;
+    expect(brief.targetRegions).toEqual(["marathwada"]);
+    // Marathi is offered as a default and labelled as one, not silently parsed out of "Marathwada".
+    expect(brief.languages).toEqual(["mr"]);
+    expect(result.notes.join(" ")).toMatch(/Suggested Marathi/);
     expect(brief.targetTiers).toEqual([2, 3]);
     expect(brief.niches).toEqual(["food"]);
   });

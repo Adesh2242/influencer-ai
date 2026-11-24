@@ -20,12 +20,12 @@ describe("discover URL params", () => {
 
 describe("filterCreators and sortCreators", () => {
   it("applies every filter", () => {
-    const query = { ...EMPTY_QUERY, lang: "ta" as const, region: "south" as const, minAuth: 60 };
+    const query = { ...EMPTY_QUERY, lang: "mr" as const, region: "western" as const, minAuth: 60 };
     const list = filterCreators(creators, query);
     expect(list.length).toBeGreaterThan(0);
     for (const c of list) {
-      expect(c.languages).toContain("ta");
-      expect(getCity(c.homeCityId)?.region).toBe("south");
+      expect(c.languages).toContain("mr");
+      expect(getCity(c.homeCityId)?.region).toBe("western");
       expect(c.authenticity.score).toBeGreaterThanOrEqual(60);
     }
   });

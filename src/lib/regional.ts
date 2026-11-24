@@ -11,8 +11,8 @@
 // views against 2,228 for the rest, at comparable subscriber counts. Marathi content is not only
 // an audience filter, it is a quality signal — the inflated-subscriber channels were overwhelmingly
 // in the non-Marathi group.
-import { MH_PLACES } from "../data/maharashtra";
-import type { Creator, CreatorTier } from "../types";
+import { DISTRICT_REGION, MH_PLACES } from "../data/maharashtra";
+import type { Creator, CreatorTier, Region } from "../types";
 
 /**
  * The six sub-regions Maharashtra marketers actually plan against. Districts are grouped the way
@@ -23,7 +23,8 @@ import type { Creator, CreatorTier } from "../types";
  * Populations are approximate, rounded from census projections, and are used for coverage
  * reporting rather than any precise calculation.
  */
-export type SubRegion = "mumbai_metro" | "western" | "north" | "marathwada" | "vidarbha" | "konkan";
+/** Maharashtra's divisions, named in types.ts as `Region`: in this product there is no other kind. */
+export type SubRegion = Region;
 
 export const SUB_REGIONS: Record<SubRegion, { label: string; population: number; note: string }> = {
   mumbai_metro: { label: "Mumbai Metropolitan", population: 2_60_00_000, note: "Mumbai, Thane, Palghar, Raigad" },
@@ -34,50 +35,12 @@ export const SUB_REGIONS: Record<SubRegion, { label: string; population: number;
   konkan: { label: "Konkan", population: 30_00_000, note: "Ratnagiri, Sindhudurg" },
 };
 
-/** District to sub-region. Districts absent here fall back to the closest large neighbour. */
-const DISTRICT_SUB_REGION: Record<string, SubRegion> = {
-  Mumbai: "mumbai_metro",
-  Thane: "mumbai_metro",
-  Palghar: "mumbai_metro",
-  Raigad: "mumbai_metro",
-  Pune: "western",
-  Satara: "western",
-  Sangli: "western",
-  Kolhapur: "western",
-  Solapur: "western",
-  Nashik: "north",
-  Jalgaon: "north",
-  Dhule: "north",
-  Nandurbar: "north",
-  Ahilyanagar: "north",
-  "Chhatrapati Sambhajinagar": "marathwada",
-  Jalna: "marathwada",
-  Beed: "marathwada",
-  Latur: "marathwada",
-  Dharashiv: "marathwada",
-  Nanded: "marathwada",
-  Parbhani: "marathwada",
-  Hingoli: "marathwada",
-  Nagpur: "vidarbha",
-  Amravati: "vidarbha",
-  Akola: "vidarbha",
-  Yavatmal: "vidarbha",
-  Wardha: "vidarbha",
-  Chandrapur: "vidarbha",
-  Gadchiroli: "vidarbha",
-  Bhandara: "vidarbha",
-  Gondia: "vidarbha",
-  Buldhana: "vidarbha",
-  Washim: "vidarbha",
-  Ratnagiri: "konkan",
-  Sindhudurg: "konkan",
-};
 
 /** City id (from the taxonomy) to sub-region, built from the gazetteer. */
 const CITY_SUB_REGION: Record<string, SubRegion> = (() => {
   const map: Record<string, SubRegion> = {};
   for (const place of MH_PLACES) {
-    const region = DISTRICT_SUB_REGION[place.district];
+    const region = DISTRICT_REGION[place.district];
     if (region && place.cityId) map[place.cityId] = region;
   }
   // No hand-written fallbacks: every district in the gazetteer appears in DISTRICT_SUB_REGION, so

@@ -1,6 +1,7 @@
 // Shared vocabulary for the Indian market: niches, languages, platforms, regions, cities and tiers.
 // Used by the UI, the demo-data generator, the matching engine and the brief parsers (including the
 // Netlify function), so it must only use relative imports and no browser APIs.
+import { DISTRICT_REGION, DISTRICTS } from "./maharashtra";
 import type {
   AgeBand,
   CampaignGoal,
@@ -150,21 +151,12 @@ export const NICHE_KEYWORDS: Record<Niche, string[]> = {
 // Languages
 // ---------------------------------------------------------------------------------------------
 
-export const LANGUAGE_CODES: LanguageCode[] = ["hi", "en", "ta", "te", "mr", "bn", "kn", "ml", "gu", "pa", "or", "as"];
+export const LANGUAGE_CODES: LanguageCode[] = ["mr", "hi", "en"];
 
 export const LANGUAGES: Record<LanguageCode, { label: string; native: string; aliases: string[] }> = {
+  mr: { label: "Marathi", native: "मराठी", aliases: ["marathi", "मराठी"] },
   hi: { label: "Hindi", native: "हिन्दी", aliases: ["hindi", "हिंदी", "हिन्दी", "hinglish"] },
   en: { label: "English", native: "English", aliases: ["english", "hinglish"] },
-  ta: { label: "Tamil", native: "தமிழ்", aliases: ["tamil", "தமிழ்"] },
-  te: { label: "Telugu", native: "తెలుగు", aliases: ["telugu", "తెలుగు"] },
-  mr: { label: "Marathi", native: "मराठी", aliases: ["marathi", "मराठी"] },
-  bn: { label: "Bengali", native: "বাংলা", aliases: ["bengali", "bangla", "বাংলা"] },
-  kn: { label: "Kannada", native: "ಕನ್ನಡ", aliases: ["kannada", "ಕನ್ನಡ"] },
-  ml: { label: "Malayalam", native: "മലയാളം", aliases: ["malayalam", "മലയാളം"] },
-  gu: { label: "Gujarati", native: "ગુજરાતી", aliases: ["gujarati", "ગુજરાતી"] },
-  pa: { label: "Punjabi", native: "ਪੰਜਾਬੀ", aliases: ["punjabi", "ਪੰਜਾਬੀ"] },
-  or: { label: "Odia", native: "ଓଡ଼ିଆ", aliases: ["odia", "oriya", "ଓଡ଼ିଆ"] },
-  as: { label: "Assamese", native: "অসমীয়া", aliases: ["assamese", "asomiya", "অসমীয়া"] },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -240,19 +232,26 @@ export const GENDER_LABELS: Record<Gender | "any", string> = { any: "Any", femal
 // Geography
 // ---------------------------------------------------------------------------------------------
 
-export const REGION_LIST: Region[] = ["north", "south", "east", "west", "central", "northeast"];
+// Ordered by audience size, which is the order a media buyer thinks in.
+export const REGION_LIST: Region[] = ["mumbai_metro", "western", "vidarbha", "marathwada", "north", "konkan"];
 
+/**
+ * Aliases here are names of the division itself, never of a city or district inside it. A division
+ * alias is blanked from the brief once matched, so listing "pune" under Western Maharashtra made
+ * "creators in Pune" target the whole division and lose the city. Districts reach their division
+ * through STATES, and cities through CITIES; this list only has to catch the division's own names.
+ */
 export const REGIONS: Record<Region, { label: string; aliases: string[] }> = {
-  north: { label: "North", aliases: ["north india", "northern india", "north indian"] },
-  south: { label: "South", aliases: ["south india", "southern india", "south indian"] },
-  east: { label: "East", aliases: ["east india", "eastern india"] },
-  west: { label: "West", aliases: ["west india", "western india"] },
-  central: { label: "Central", aliases: ["central india"] },
-  northeast: { label: "Northeast", aliases: ["northeast", "north east", "north-east", "seven sisters"] },
+  mumbai_metro: { label: "Mumbai Metropolitan", aliases: ["mumbai metropolitan region", "mumbai metropolitan", "mumbai metro", "mmr"] },
+  western: { label: "Western Maharashtra", aliases: ["western maharashtra", "west maharashtra", "pune belt", "sugar belt"] },
+  north: { label: "North Maharashtra", aliases: ["north maharashtra", "northern maharashtra", "khandesh"] },
+  marathwada: { label: "Marathwada", aliases: ["marathwada", "मराठवाडा"] },
+  vidarbha: { label: "Vidarbha", aliases: ["vidarbha", "विदर्भ"] },
+  konkan: { label: "Konkan", aliases: ["konkan", "coastal maharashtra", "कोकण"] },
 };
 
-/** Phrases that mean the Hindi-speaking north and central states. */
-export const HINDI_BELT_ALIASES = ["hindi belt", "hindi heartland", "hindi-speaking states", "hindi speaking states"];
+/** Phrases that mean the whole state, i.e. no division filter at all. */
+export const STATEWIDE_ALIASES = ["all maharashtra", "across maharashtra", "whole maharashtra", "pan maharashtra", "statewide", "महाराष्ट्रभर"];
 
 /** Phrases that mean "no geographic preference". */
 export const PAN_INDIA_ALIASES = ["pan india", "pan-india", "all india", "all-india", "nationwide", "across india", "pan indian"];
@@ -261,41 +260,43 @@ export const CITY_TIER_LIST: CityTier[] = [1, 2, 3];
 
 export const CITY_TIER_LABELS: Record<CityTier, string> = { 1: "Tier 1 (metros)", 2: "Tier 2", 3: "Tier 3 & smaller" };
 
+/** Romanised and Devanagari spellings a brief might use for a district. */
+function districtAliases(district: string): string[] {
+  const lower = district.toLowerCase();
+  const extra: Record<string, string[]> = {
+    "Chhatrapati Sambhajinagar": ["aurangabad", "sambhajinagar", "छत्रपती संभाजीनगर", "औरंगाबाद"],
+    Mumbai: ["bombay", "मुंबई"],
+    "Mumbai Suburban": ["mumbai suburban", "western suburbs"],
+    Pune: ["poona", "पुणे"],
+    Nashik: ["nasik", "नाशिक"],
+    Nagpur: ["नागपूर"],
+    Kolhapur: ["कोल्हापूर"],
+    Ahilyanagar: ["ahmednagar", "ahilyanagar", "अहिल्यानगर"],
+    Dharashiv: ["osmanabad", "धाराशिव"],
+    Thane: ["ठाणे"],
+  };
+  return [lower, ...(extra[district] ?? [])];
+}
+
 export const CITY_TIER_ALIASES: Record<CityTier, string[]> = {
   1: ["tier 1", "tier-1", "tier i", "tier one", "metro", "metros", "metro cities", "metropolitan"],
   2: ["tier 2", "tier-2", "tier ii", "tier two"],
   3: ["tier 3", "tier-3", "tier iii", "tier three", "small towns", "small-town", "smaller towns", "rural"],
 };
 
-export const STATES: State[] = [
-  { name: "Maharashtra", region: "west", lang: "mr", aliases: ["maharashtra"], abbr: ["MH"] },
-  { name: "Gujarat", region: "west", lang: "gu", aliases: ["gujarat"], abbr: ["GJ"] },
-  { name: "Goa", region: "west", lang: "en", aliases: ["goa"], abbr: [] },
-  { name: "Rajasthan", region: "north", lang: "hi", aliases: ["rajasthan"], abbr: ["RJ"] },
-  { name: "Punjab", region: "north", lang: "pa", aliases: ["punjab"], abbr: [] },
-  { name: "Haryana", region: "north", lang: "hi", aliases: ["haryana"], abbr: [] },
-  { name: "Delhi", region: "north", lang: "hi", aliases: ["delhi ncr", "ncr"], abbr: ["NCR"] },
-  { name: "Uttar Pradesh", region: "north", lang: "hi", aliases: ["uttar pradesh"], abbr: ["UP"] },
-  { name: "Uttarakhand", region: "north", lang: "hi", aliases: ["uttarakhand", "uttaranchal"], abbr: ["UK"] },
-  { name: "Himachal Pradesh", region: "north", lang: "hi", aliases: ["himachal pradesh", "himachal"], abbr: ["HP"] },
-  { name: "Jammu & Kashmir", region: "north", lang: "hi", aliases: ["jammu and kashmir", "jammu & kashmir", "kashmir"], abbr: ["J&K", "JK"] },
-  { name: "Chandigarh", region: "north", lang: "pa", aliases: [], abbr: [] },
-  { name: "Madhya Pradesh", region: "central", lang: "hi", aliases: ["madhya pradesh"], abbr: ["MP"] },
-  { name: "Chhattisgarh", region: "central", lang: "hi", aliases: ["chhattisgarh", "chattisgarh"], abbr: ["CG"] },
-  { name: "Bihar", region: "east", lang: "hi", aliases: ["bihar"], abbr: [] },
-  { name: "Jharkhand", region: "east", lang: "hi", aliases: ["jharkhand"], abbr: [] },
-  { name: "West Bengal", region: "east", lang: "bn", aliases: ["west bengal", "bengal"], abbr: ["WB"] },
-  { name: "Odisha", region: "east", lang: "or", aliases: ["odisha", "orissa"], abbr: [] },
-  { name: "Assam", region: "northeast", lang: "as", aliases: ["assam"], abbr: [] },
-  { name: "Meghalaya", region: "northeast", lang: "en", aliases: ["meghalaya"], abbr: [] },
-  { name: "Manipur", region: "northeast", lang: "en", aliases: ["manipur"], abbr: [] },
-  { name: "Tamil Nadu", region: "south", lang: "ta", aliases: ["tamil nadu", "tamilnadu"], abbr: ["TN"] },
-  { name: "Puducherry", region: "south", lang: "ta", aliases: ["puducherry", "pondicherry"], abbr: [] },
-  { name: "Kerala", region: "south", lang: "ml", aliases: ["kerala"], abbr: ["KL"] },
-  { name: "Karnataka", region: "south", lang: "kn", aliases: ["karnataka"], abbr: ["KA"] },
-  { name: "Andhra Pradesh", region: "south", lang: "te", aliases: ["andhra pradesh", "andhra"], abbr: ["AP"] },
-  { name: "Telangana", region: "south", lang: "te", aliases: ["telangana"], abbr: ["TS"] },
-];
+/**
+ * Maharashtra's districts, standing where a list of Indian states used to. In a Maharashtra-only
+ * catalogue "which state?" has one answer, and the question a buyer actually asks is which part of
+ * the state: a Kolhapur brief and a Nagpur brief want different creators. The `region` field is the
+ * division, so naming a district in a brief targets its division.
+ */
+export const STATES: State[] = DISTRICTS.map((district) => ({
+  name: district,
+  region: DISTRICT_REGION[district] as Region,
+  lang: "mr" as LanguageCode,
+  aliases: districtAliases(district),
+  abbr: [],
+}));
 
 function city(
   id: string,
@@ -310,86 +311,14 @@ function city(
 }
 
 export const CITIES: City[] = [
-  // Tier 1
-  city("mumbai", "Mumbai", "Maharashtra", 1, "west", "mr", ["bombay"]),
-  city("delhi", "Delhi", "Delhi", 1, "north", "hi", ["new delhi", "dilli"]),
-  city("bengaluru", "Bengaluru", "Karnataka", 1, "south", "kn", ["bangalore", "blr"]),
-  city("hyderabad", "Hyderabad", "Telangana", 1, "south", "te", ["hyd"]),
-  city("chennai", "Chennai", "Tamil Nadu", 1, "south", "ta", ["madras"]),
-  city("kolkata", "Kolkata", "West Bengal", 1, "east", "bn", ["calcutta"]),
-  city("pune", "Pune", "Maharashtra", 1, "west", "mr", ["poona"]),
-  city("ahmedabad", "Ahmedabad", "Gujarat", 1, "west", "gu", ["amdavad"]),
-  // Tier 2
-  city("jaipur", "Jaipur", "Rajasthan", 2, "north", "hi"),
-  city("lucknow", "Lucknow", "Uttar Pradesh", 2, "north", "hi"),
-  city("kanpur", "Kanpur", "Uttar Pradesh", 2, "north", "hi"),
-  city("nagpur", "Nagpur", "Maharashtra", 2, "west", "mr"),
-  city("indore", "Indore", "Madhya Pradesh", 2, "central", "hi"),
-  city("bhopal", "Bhopal", "Madhya Pradesh", 2, "central", "hi"),
-  city("jabalpur", "Jabalpur", "Madhya Pradesh", 2, "central", "hi"),
-  city("patna", "Patna", "Bihar", 2, "east", "hi"),
-  city("vadodara", "Vadodara", "Gujarat", 2, "west", "gu", ["baroda"]),
-  city("surat", "Surat", "Gujarat", 2, "west", "gu"),
-  city("rajkot", "Rajkot", "Gujarat", 2, "west", "gu"),
-  city("coimbatore", "Coimbatore", "Tamil Nadu", 2, "south", "ta", ["kovai"]),
-  city("madurai", "Madurai", "Tamil Nadu", 2, "south", "ta"),
-  city("kochi", "Kochi", "Kerala", 2, "south", "ml", ["cochin", "ernakulam"]),
-  city("thiruvananthapuram", "Thiruvananthapuram", "Kerala", 2, "south", "ml", ["trivandrum"]),
-  city("kozhikode", "Kozhikode", "Kerala", 2, "south", "ml", ["calicut"]),
-  city("visakhapatnam", "Visakhapatnam", "Andhra Pradesh", 2, "south", "te", ["vizag"]),
-  city("vijayawada", "Vijayawada", "Andhra Pradesh", 2, "south", "te"),
-  city("mysuru", "Mysuru", "Karnataka", 2, "south", "kn", ["mysore"]),
-  city("mangaluru", "Mangaluru", "Karnataka", 2, "south", "kn", ["mangalore"]),
-  city("chandigarh", "Chandigarh", "Chandigarh", 2, "north", "pa"),
-  city("ludhiana", "Ludhiana", "Punjab", 2, "north", "pa"),
-  city("amritsar", "Amritsar", "Punjab", 2, "north", "pa"),
-  city("nashik", "Nashik", "Maharashtra", 2, "west", "mr", ["nasik"]),
-  city("sambhajinagar", "Chhatrapati Sambhajinagar", "Maharashtra", 2, "west", "mr", ["aurangabad", "sambhajinagar"]),
-  city("bhubaneswar", "Bhubaneswar", "Odisha", 2, "east", "or"),
-  city("guwahati", "Guwahati", "Assam", 2, "northeast", "as"),
-  city("dehradun", "Dehradun", "Uttarakhand", 2, "north", "hi"),
-  city("ranchi", "Ranchi", "Jharkhand", 2, "east", "hi"),
-  city("raipur", "Raipur", "Chhattisgarh", 2, "central", "hi"),
-  city("varanasi", "Varanasi", "Uttar Pradesh", 2, "north", "hi", ["banaras", "benares", "kashi"]),
-  city("agra", "Agra", "Uttar Pradesh", 2, "north", "hi"),
-  city("prayagraj", "Prayagraj", "Uttar Pradesh", 2, "north", "hi", ["allahabad"]),
-  city("meerut", "Meerut", "Uttar Pradesh", 2, "north", "hi"),
-  city("noida", "Noida", "Uttar Pradesh", 2, "north", "hi"),
-  city("gurugram", "Gurugram", "Haryana", 2, "north", "hi", ["gurgaon"]),
-  city("jodhpur", "Jodhpur", "Rajasthan", 2, "north", "hi"),
-  // Tier 3 and smaller
-  city("udaipur", "Udaipur", "Rajasthan", 3, "north", "hi"),
-  city("bikaner", "Bikaner", "Rajasthan", 3, "north", "hi"),
-  city("bareilly", "Bareilly", "Uttar Pradesh", 3, "north", "hi"),
-  city("gorakhpur", "Gorakhpur", "Uttar Pradesh", 3, "north", "hi"),
-  city("jalandhar", "Jalandhar", "Punjab", 3, "north", "pa"),
-  city("hisar", "Hisar", "Haryana", 3, "north", "hi"),
-  city("karnal", "Karnal", "Haryana", 3, "north", "hi"),
-  city("jammu", "Jammu", "Jammu & Kashmir", 3, "north", "hi"),
-  city("bilaspur", "Bilaspur", "Chhattisgarh", 3, "central", "hi"),
-  city("gaya", "Gaya", "Bihar", 3, "east", "hi"),
-  city("muzaffarpur", "Muzaffarpur", "Bihar", 3, "east", "hi"),
-  city("cuttack", "Cuttack", "Odisha", 3, "east", "or"),
-  city("siliguri", "Siliguri", "West Bengal", 3, "east", "bn"),
-  city("durgapur", "Durgapur", "West Bengal", 3, "east", "bn"),
-  city("dibrugarh", "Dibrugarh", "Assam", 3, "northeast", "as"),
-  city("shillong", "Shillong", "Meghalaya", 3, "northeast", "en"),
-  city("imphal", "Imphal", "Manipur", 3, "northeast", "en"),
-  city("kolhapur", "Kolhapur", "Maharashtra", 3, "west", "mr"),
-  city("nanded", "Nanded", "Maharashtra", 3, "west", "mr"),
-  city("bhavnagar", "Bhavnagar", "Gujarat", 3, "west", "gu"),
-  city("anand", "Anand", "Gujarat", 3, "west", "gu"),
-  city("panaji", "Panaji", "Goa", 3, "west", "en", ["panjim"]),
-  city("hubballi", "Hubballi", "Karnataka", 3, "south", "kn", ["hubli", "hubli-dharwad"]),
-  city("belagavi", "Belagavi", "Karnataka", 3, "south", "kn", ["belgaum"]),
-  city("tiruchirappalli", "Tiruchirappalli", "Tamil Nadu", 3, "south", "ta", ["trichy", "tiruchi"]),
-  city("salem", "Salem", "Tamil Nadu", 3, "south", "ta"),
-  city("tirunelveli", "Tirunelveli", "Tamil Nadu", 3, "south", "ta"),
-  city("puducherry", "Puducherry", "Puducherry", 3, "south", "ta", ["pondicherry", "pondy"]),
-  city("thrissur", "Thrissur", "Kerala", 3, "south", "ml", ["trichur"]),
-  city("warangal", "Warangal", "Telangana", 3, "south", "te"),
-  city("guntur", "Guntur", "Andhra Pradesh", 3, "south", "te"),
-  city("kurnool", "Kurnool", "Andhra Pradesh", 3, "south", "te"),
+  city("mumbai", "Mumbai", "Maharashtra", 1, "mumbai_metro", "mr", ["bombay", "navi mumbai", "thane"]),
+  city("pune", "Pune", "Maharashtra", 1, "western", "mr", ["poona", "pimpri", "chinchwad"]),
+  city("nagpur", "Nagpur", "Maharashtra", 2, "vidarbha", "mr"),
+  city("nashik", "Nashik", "Maharashtra", 2, "north", "mr", ["nasik"]),
+  city("sambhajinagar", "Chhatrapati Sambhajinagar", "Maharashtra", 2, "marathwada", "mr", ["aurangabad", "sambhajinagar"]),
+  city("kolhapur", "Kolhapur", "Maharashtra", 3, "western", "mr"),
+  city("nanded", "Nanded", "Maharashtra", 3, "marathwada", "mr"),
+  city("ratnagiri", "Ratnagiri", "Maharashtra", 3, "konkan", "mr", ["chiplun", "sindhudurg"]),
 ];
 
 export const CITY_BY_ID: Record<string, City> = Object.fromEntries(CITIES.map((c) => [c.id, c]));

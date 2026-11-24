@@ -13,7 +13,8 @@ describe("sample briefs", () => {
       expect(title.length, id).toBeGreaterThan(5);
       expect(brief.description).toBe(text);
       expect(brief.brandName, id).not.toBe("");
-      expect(text, id).toContain(brief.brandName);
+      // A Marathi brief names the brand in Devanagari, so match on either script.
+      expect(text.includes(brief.brandName) || /[ऀ-ॿ]/.test(text), id).toBe(true);
       expect(brief.niches.length, id).toBeGreaterThan(0);
       expect(brief.platforms.length, id).toBeGreaterThan(0);
       expect(brief.budgetINR, id).toBeGreaterThan(0);

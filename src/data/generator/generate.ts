@@ -36,16 +36,7 @@ export const DATASET_SIZE = 250;
 const LANGUAGE_WEIGHTS: Record<LanguageCode, number> = {
   hi: 27,
   en: 16,
-  ta: 7.2,
-  te: 7.2,
   mr: 6.4,
-  bn: 6.4,
-  kn: 5.6,
-  ml: 5.6,
-  gu: 4.8,
-  pa: 4.8,
-  or: 4.4,
-  as: 4.4,
 };
 
 const NICHE_WEIGHTS: Record<Niche, number> = {
@@ -145,16 +136,7 @@ const REGIONAL_NICHE_AFFINITY: Partial<Record<Niche, number>> = {
 };
 
 const LANGUAGE_NICHE_BOOST: Partial<Record<LanguageCode, Partial<Record<Niche, number>>>> = {
-  pa: { agriculture: 1.8, sports: 1.5, entertainment: 1.2, fitness: 1.3 },
   mr: { agriculture: 1.4 },
-  te: { agriculture: 1.3, tech: 1.3, entertainment: 1.2 },
-  ta: { tech: 1.3, entertainment: 1.2 },
-  ml: { tech: 1.3, travel: 1.3 },
-  kn: { agriculture: 1.2, tech: 1.2 },
-  gu: { food: 1.2, finance: 1.4, fashion: 1.2, devotional: 1.2 },
-  bn: { food: 1.2, entertainment: 1.2, education: 1.2 },
-  or: { devotional: 1.3 },
-  as: { travel: 1.3, food: 1.2 },
 };
 
 function nicheAffinity(lang: LanguageCode, niche: Niche): number {
@@ -167,16 +149,7 @@ function nicheAffinity(lang: LanguageCode, niche: Niche): number {
 const UPPER_TIER_LANGUAGE: Record<LanguageCode, number> = {
   hi: 1,
   en: 1,
-  ta: 0.8,
-  te: 0.8,
   mr: 0.55,
-  bn: 0.55,
-  kn: 0.5,
-  ml: 0.55,
-  gu: 0.4,
-  pa: 0.6,
-  or: 0.15,
-  as: 0.15,
 };
 
 const UPPER_TIER_NICHE: Record<Niche, number> = {
@@ -380,7 +353,7 @@ const FEMALE_CREATOR_SHARE: Partial<Record<Niche, number>> = {
 function pickContentLanguages(rng: Rng, lang: LanguageCode, home: City): LanguageCode[] {
   const languages: LanguageCode[] = [lang];
   if (lang === "en") {
-    const hindiLeaning = home.lang === "hi" || home.region === "north" || home.region === "central";
+    const hindiLeaning = home.region === "mumbai_metro";
     if (rng.chance(hindiLeaning ? 0.45 : 0.25)) languages.push("hi");
     else if (home.lang !== "en" && home.lang !== "hi" && rng.chance(0.3)) languages.push(home.lang);
   } else if (lang === "hi") {
@@ -638,19 +611,12 @@ const AUDIENCE_TIERS_BY_HOME: Record<CityTier, number[]> = {
   3: [0.18, 0.4, 0.42],
 };
 
+// Where each language's audience sits, across Maharashtra's divisions. Marathi concentrates in
+// the Marathi-speaking interior; Hindi and English skew hard to the Mumbai metro belt.
 const LANGUAGE_REGIONS: Record<LanguageCode, Partial<Record<Region, number>>> = {
-  hi: { north: 0.45, central: 0.2, east: 0.18, west: 0.1, south: 0.04, northeast: 0.03 },
-  en: { north: 0.24, south: 0.26, west: 0.26, east: 0.12, central: 0.07, northeast: 0.05 },
-  ta: { south: 0.86, west: 0.05, north: 0.04, east: 0.02, central: 0.02, northeast: 0.01 },
-  te: { south: 0.86, west: 0.05, north: 0.04, east: 0.02, central: 0.02, northeast: 0.01 },
-  kn: { south: 0.86, west: 0.07, north: 0.03, east: 0.02, central: 0.01, northeast: 0.01 },
-  ml: { south: 0.85, west: 0.06, north: 0.05, east: 0.02, central: 0.01, northeast: 0.01 },
-  mr: { west: 0.82, central: 0.07, north: 0.05, south: 0.04, east: 0.01, northeast: 0.01 },
-  gu: { west: 0.8, north: 0.08, central: 0.05, south: 0.04, east: 0.02, northeast: 0.01 },
-  bn: { east: 0.8, northeast: 0.07, north: 0.06, west: 0.04, south: 0.02, central: 0.01 },
-  or: { east: 0.82, south: 0.06, north: 0.04, west: 0.04, central: 0.03, northeast: 0.01 },
-  as: { northeast: 0.76, east: 0.12, north: 0.06, west: 0.03, south: 0.02, central: 0.01 },
-  pa: { north: 0.84, west: 0.06, central: 0.04, east: 0.03, south: 0.02, northeast: 0.01 },
+  mr: { western: 0.27, mumbai_metro: 0.24, vidarbha: 0.18, marathwada: 0.16, north: 0.11, konkan: 0.04 },
+  hi: { mumbai_metro: 0.52, vidarbha: 0.16, western: 0.14, north: 0.1, marathwada: 0.07, konkan: 0.01 },
+  en: { mumbai_metro: 0.58, western: 0.22, vidarbha: 0.08, north: 0.06, marathwada: 0.04, konkan: 0.02 },
 };
 
 const CITY_TIER_PULL: Record<CityTier, number> = { 1: 6, 2: 1.6, 3: 0.5 };
@@ -701,7 +667,7 @@ export function buildAudience(
   const regionShares = toShares(regionWeights);
   const regions = Object.fromEntries(REGION_LIST.map((region, i) => [region, regionShares[i]])) as Record<Region, number>;
 
-  return { gender, age, tiers, regions, topCities: buildTopCities(rng, home, regions, languages), languages: buildAudienceLanguages(rng, languages, home) };
+  return { gender, age, tiers, regions, topCities: buildTopCities(rng, home, regions, languages), languages: buildAudienceLanguages(rng, languages) };
 }
 
 function cityFraction(rng: Rng, city: City, isHome: boolean): number {
@@ -739,13 +705,13 @@ function buildTopCities(rng: Rng, home: City, regions: Record<Region, number>, l
     .sort((a, b) => b.share - a.share || a.cityId.localeCompare(b.cityId));
 }
 
-function buildAudienceLanguages(rng: Rng, languages: LanguageCode[], home: City): AudienceProfile["languages"] {
+function buildAudienceLanguages(rng: Rng, languages: LanguageCode[]): AudienceProfile["languages"] {
   const [primary, ...secondary] = languages;
   const [low, high] = primary === "en" ? [0.52, 0.68] : primary === "hi" ? [0.6, 0.86] : [0.64, 0.9];
   const primaryShare = rng.range(low, high);
 
   const others: LanguageCode[] = [...secondary];
-  const extras: LanguageCode[] = primary === "en" ? ["hi", home.lang, "mr"] : primary === "hi" ? ["en", home.lang, "pa"] : ["en", "hi"];
+  const extras: LanguageCode[] = primary === "en" ? ["hi", "mr"] : primary === "hi" ? ["en", "mr"] : ["en", "hi"];
   for (const code of extras) {
     if (others.length >= 3) break;
     if (code !== primary && !others.includes(code)) others.push(code);

@@ -4,7 +4,7 @@ import { DEFAULT_BRIEF, mergeBrief } from "@/lib/brief/defaults";
 import { matchCreators } from "@/lib/matching/engine";
 import { estimateStats, exclusionKind, groupExclusions, isBlankBrief, sortResults, summarizeMatches } from "./results";
 
-const brief = mergeBrief(DEFAULT_BRIEF, { niches: ["beauty"], languages: ["ta", "te"], targetRegions: ["south"], budgetINR: 300_000, creatorsWanted: 8 });
+const brief = mergeBrief(DEFAULT_BRIEF, { niches: ["beauty"], languages: ["mr", "hi"], targetRegions: ["western"], budgetINR: 300_000, creatorsWanted: 8 });
 const { results, excluded } = matchCreators(brief, creators);
 
 function isSorted(values: number[], direction: "asc" | "desc"): boolean {

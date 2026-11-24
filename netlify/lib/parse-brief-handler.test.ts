@@ -7,14 +7,14 @@ const OUTPUT = {
   productCategory: "vitamin C serum",
   goal: "awareness",
   niches: ["beauty"],
-  languages: ["ta", "te"],
+  languages: ["mr"],
   platforms: ["instagram"],
   deliverable: "reel",
   targetGender: "female",
   targetAges: ["18-24", "25-34"],
   targetTiers: [],
-  targetRegions: ["south"],
-  targetCities: ["Madras", "Gotham"],
+  targetRegions: ["western"],
+  targetCities: ["Poona", "Gotham"],
   creatorTiers: ["micro"],
   budgetINR: 300000,
   creatorsWanted: 8,
@@ -70,15 +70,15 @@ describe("handleParseBrief", () => {
 
   it("returns the parsed brief on success", async () => {
     const { spy, deps } = fakeClient(async () => message(JSON.stringify(OUTPUT)));
-    const res = await handleParseBrief(post({ text: "  Glowleaf serum launch in Madras  " }), deps);
+    const res = await handleParseBrief(post({ text: "  Glowleaf serum launch in Poona  " }), deps);
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     const { parsed } = await res.json();
     expect(parsed.source).toBe("ai");
     expect(parsed.brief).toMatchObject({
       brandName: "Glowleaf Naturals",
-      description: "Glowleaf serum launch in Madras",
-      targetCityIds: ["chennai"],
+      description: "Glowleaf serum launch in Poona",
+      targetCityIds: ["pune"],
       budgetINR: 300000,
       creatorsWanted: 8,
     });
@@ -92,7 +92,7 @@ describe("handleParseBrief", () => {
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "low", format: { type: "json_schema" } },
-      messages: [{ role: "user", content: "Glowleaf serum launch in Madras" }],
+      messages: [{ role: "user", content: "Glowleaf serum launch in Poona" }],
     });
     expect(params).not.toHaveProperty("thinking");
     expect(params).not.toHaveProperty("temperature");

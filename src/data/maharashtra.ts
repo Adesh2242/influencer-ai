@@ -1,7 +1,7 @@
 // Gazetteer used to decide whether a creator is based in Maharashtra. No platform API exposes an
 // Indian state, so location has to be inferred from the words a creator writes about themselves.
 // Entries carry Devanagari and Romanised spellings because Marathi channels mix both freely.
-import type { CityTier } from "../types";
+import type { CityTier, Region } from "../types";
 
 export interface MhPlace {
   /** City id from data/taxonomy.ts when one exists, so creators land on a known city. */
@@ -91,7 +91,7 @@ export const MH_PLACES: MhPlace[] = [
   place("Dharashiv", "Dharashiv", 3, ["osmanabad", "धाराशिव", "उस्मानाबाद"]),
   place("Malegaon", "Nashik", 3, ["मालेगाव"]),
   place("Ichalkaranji", "Kolhapur", 3, ["इचलकरंजी"]),
-  place("Ratnagiri", "Ratnagiri", 3, ["रत्नागिरी"]),
+  place("Ratnagiri", "Ratnagiri", 3, ["रत्नागिरी"], { cityId: "ratnagiri" }),
   place("Sindhudurg", "Sindhudurg", 3, ["सिंधुदुर्ग", "malvan", "मालवण"]),
   place("Alibaug", "Raigad", 3, ["alibag", "अलिबाग"]),
   place("Raigad", "Raigad", 3, ["रायगड"]),
@@ -156,3 +156,50 @@ export const MARATHI_MARKERS = [
   "marathi",
   "मराठमोळ",
 ];
+
+/**
+ * Every district of Maharashtra, grouped into the division its media buying belongs to. Shared by
+ * the taxonomy (so a brief can name a district) and by the regional reach model (so a creator's
+ * city resolves to a division). Kept here, in the data layer, because having two copies invites
+ * them to disagree.
+ */
+export const DISTRICT_REGION: Record<string, Region> = {
+  Mumbai: "mumbai_metro",
+  Thane: "mumbai_metro",
+  Palghar: "mumbai_metro",
+  Raigad: "mumbai_metro",
+  Pune: "western",
+  Satara: "western",
+  Sangli: "western",
+  Kolhapur: "western",
+  Solapur: "western",
+  Nashik: "north",
+  Jalgaon: "north",
+  Dhule: "north",
+  Nandurbar: "north",
+  Ahilyanagar: "north",
+  "Chhatrapati Sambhajinagar": "marathwada",
+  Jalna: "marathwada",
+  Beed: "marathwada",
+  Latur: "marathwada",
+  Dharashiv: "marathwada",
+  Nanded: "marathwada",
+  Parbhani: "marathwada",
+  Hingoli: "marathwada",
+  Nagpur: "vidarbha",
+  Amravati: "vidarbha",
+  Akola: "vidarbha",
+  Yavatmal: "vidarbha",
+  Wardha: "vidarbha",
+  Chandrapur: "vidarbha",
+  Gadchiroli: "vidarbha",
+  Bhandara: "vidarbha",
+  Gondia: "vidarbha",
+  Buldhana: "vidarbha",
+  Washim: "vidarbha",
+  Ratnagiri: "konkan",
+  Sindhudurg: "konkan",
+};
+
+/** District names, grouped by division, for building brief-parsing aliases. */
+export const DISTRICTS = Object.keys(DISTRICT_REGION).sort();

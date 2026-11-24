@@ -18,8 +18,8 @@ const CREATOR: Creator = {
   name: "Meera Krishnan",
   handle: "meera.cooks.tamil",
   bio: "Everyday Chettinad recipes and kitchen hacks.",
-  homeCityId: "chennai",
-  languages: ["ta", "en"],
+  homeCityId: "pune",
+  languages: ["mr", "en"],
   niches: ["food", "lifestyle"],
   topics: ["recipes", "millets", "kitchen"],
   platforms: [
@@ -31,16 +31,16 @@ const CREATOR: Creator = {
     gender: { female: 0.71, male: 0.27 },
     age: { "13-17": 0.03, "18-24": 0.22, "25-34": 0.41, "35-44": 0.24, "45+": 0.1 },
     tiers: { 1: 0.38, 2: 0.4, 3: 0.22 },
-    regions: { north: 0.04, south: 0.86, east: 0.02, west: 0.05, central: 0.01, northeast: 0.02 },
+    regions: { western: 0.62, mumbai_metro: 0.18, north: 0.1, marathwada: 0.05, vidarbha: 0.04, konkan: 0.01 },
     topCities: [
-      { cityId: "chennai", share: 0.24 },
-      { cityId: "coimbatore", share: 0.11 },
-      { cityId: "madurai", share: 0.08 },
-      { cityId: "bengaluru", share: 0.06 },
+      { cityId: "pune", share: 0.24 },
+      { cityId: "kolhapur", share: 0.11 },
+      { cityId: "nashik", share: 0.08 },
+      { cityId: "nashik", share: 0.06 },
       { cityId: "salem", share: 0.04 },
     ],
     languages: [
-      { code: "ta", share: 0.78 },
+      { code: "mr", share: 0.78 },
       { code: "en", share: 0.15 },
     ],
   },
@@ -61,8 +61,8 @@ const BRIEF: CampaignBrief = {
   brandName: "Millet Mornings",
   productCategory: "Breakfast cereal",
   niches: ["food", "health"],
-  languages: ["ta"],
-  targetRegions: ["south"],
+  languages: ["mr"],
+  targetRegions: ["western"],
   targetGender: "female",
 };
 
@@ -96,7 +96,7 @@ describe("buildOutreachMessage", () => {
           expect(message.body).toContain("1 Instagram Reel");
           expect(message.body).toContain("₹38,000");
           expect(message.body).toContain("GST");
-          expect(message.body).toContain("Chennai");
+          expect(message.body).toContain(language === "mr" ? "पुणे" : "Pune");
           // The brand's own product category is never translated — it is free text they typed.
           expect(message.body).toContain("breakfast cereal");
           expect(message.body).toMatch(language === "mr" ? /कॅम्पेन/ : /campaign/);
@@ -132,8 +132,8 @@ describe("buildOutreachMessage", () => {
 
   it("explains the fit from the brief's targeting", () => {
     const { body } = buildOutreachMessage({ creator: CREATOR, brief: BRIEF, estimate: ESTIMATE, language: "en", channel: "email" });
-    expect(body).toContain("86% of your audience is in South India");
-    expect(body).toContain("you create in Tamil");
+    expect(body).toContain("of your audience is in Western Maharashtra");
+    expect(body).toContain("you create in Marathi");
   });
 
   it("falls back gracefully when the brief is empty and the data is sparse", () => {
@@ -288,7 +288,8 @@ describe("defaultOutreachLanguage", () => {
     expect(defaultOutreachLanguage({ ...CREATOR, languages: ["hi"] })).toBe("hinglish");
   });
 
-  it("opens in English otherwise", () => {
-    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["ta", "en"] })).toBe("en");
+  it("opens in English for a creator who publishes in neither Marathi nor only Hindi", () => {
+    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["en"] })).toBe("en");
+    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["hi", "en"] })).toBe("en");
   });
 });

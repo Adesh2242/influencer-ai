@@ -235,16 +235,12 @@ export function buildBio(rng: Rng, options: { cityName: string; languages: Langu
   return `${lead}. ${rng.weighted(extras, (extra) => extra.weight).text}`;
 }
 
-/** Keywords tied to one film industry or regional festival only suit creators in those languages. */
+/** Keywords tied to one film industry or festival only suit creators in those languages. */
 const LANGUAGE_BOUND_TOPICS: Record<string, LanguageCode[]> = {
-  bollywood: ["hi", "en", "mr", "gu", "pa"],
-  tollywood: ["te"],
-  kollywood: ["ta"],
-  mollywood: ["ml"],
-  onam: ["ml"],
-  pongal: ["ta", "te", "kn"],
-  "durga puja": ["bn", "or", "as", "hi", "en"],
-  navratri: ["hi", "gu", "mr", "en"],
+  bollywood: ["hi", "en", "mr"],
+  marathi_cinema: ["mr"],
+  ganeshotsav: ["mr", "hi", "en"],
+  navratri: ["hi", "mr", "en"],
 };
 
 function suitsLanguages(keyword: string, languages: LanguageCode[]): boolean {

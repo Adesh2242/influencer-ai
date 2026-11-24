@@ -3,10 +3,20 @@
 
 export type Platform = "instagram" | "youtube" | "moj" | "sharechat" | "linkedin";
 
-/** ISO 639-1 codes for the content languages we support. */
-export type LanguageCode = "hi" | "en" | "ta" | "te" | "mr" | "bn" | "kn" | "ml" | "gu" | "pa" | "or" | "as";
+/**
+ * ISO 639-1 codes for the content languages we support. The catalogue is Maharashtra-only, so
+ * these are the languages Maharashtra creators actually publish in. Carrying the other nine was
+ * not neutral: the coverage panel advertised twelve languages and then said "No creators yet"
+ * nine times, and a brief could ask for Tamil creators that this product will never have.
+ */
+export type LanguageCode = "mr" | "hi" | "en";
 
-export type Region = "north" | "south" | "east" | "west" | "central" | "northeast";
+/**
+ * Maharashtra's revenue divisions, which is what "region" means in a Maharashtra-only product.
+ * Targeting North or South India is meaningless when every creator is in one state; these are the
+ * divisions a media buyer here actually plans against.
+ */
+export type Region = "mumbai_metro" | "western" | "north" | "marathwada" | "vidarbha" | "konkan";
 
 /** 1 = metros, 2 = large non-metro cities, 3 = smaller cities and towns. */
 export type CityTier = 1 | 2 | 3;

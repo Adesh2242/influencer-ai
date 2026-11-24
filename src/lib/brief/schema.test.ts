@@ -80,8 +80,8 @@ describe("aiOutputToParsedBrief", () => {
   });
 
   it("maps city names and aliases to ids and reports unknown cities", () => {
-    const parsed = aiOutputToParsedBrief({ ...EMPTY, targetCities: ["Bangalore", "new delhi", "BOMBAY", "Mysore city", "Atlantis"] });
-    expect(parsed.brief.targetCityIds).toEqual(["bengaluru", "delhi", "mumbai", "mysuru"]);
+    const parsed = aiOutputToParsedBrief({ ...EMPTY, targetCities: ["Poona", "nashik", "BOMBAY", "Aurangabad", "Atlantis"] });
+    expect(parsed.brief.targetCityIds).toEqual(["pune", "nashik", "mumbai", "sambhajinagar"]);
     expect(parsed.notes.join(" ")).toMatch(/Atlantis/);
     expect(parsed.detectedFields).toEqual(["targetCityIds"]);
   });
@@ -94,13 +94,13 @@ describe("aiOutputToParsedBrief", () => {
         productCategory: "vitamin C serum",
         goal: "awareness",
         niches: ["beauty", "beauty", "health"],
-        languages: ["ta", "te"],
+        languages: ["mr", "hi"],
         platforms: ["instagram"],
         deliverable: "reel",
         targetGender: "female",
         targetAges: ["25-34", "18-24"],
         targetTiers: [3, 1],
-        targetRegions: ["south"],
+        targetRegions: ["western"],
         creatorTiers: ["mid", "micro"],
         budgetINR: 300_000,
         creatorsWanted: 8,
@@ -117,13 +117,13 @@ describe("aiOutputToParsedBrief", () => {
       description: "the brief",
       goal: "awareness",
       niches: ["beauty", "health"],
-      languages: ["ta", "te"],
+      languages: ["mr", "hi"],
       platforms: ["instagram"],
       deliverable: "reel",
       targetGender: "female",
       targetAges: ["18-24", "25-34"],
       targetTiers: [1, 3],
-      targetRegions: ["south"],
+      targetRegions: ["western"],
       creatorTiers: ["micro", "mid"],
       budgetINR: 300_000,
       creatorsWanted: 8,
@@ -135,8 +135,8 @@ describe("aiOutputToParsedBrief", () => {
   });
 
   it("looks up cities case-insensitively", () => {
-    expect(cityIdForName("TRIVANDRUM")).toBe("thiruvananthapuram");
-    expect(cityIdForName("Hubli-Dharwad")).toBe("hubballi");
+    expect(cityIdForName("POONA")).toBe("pune");
+    expect(cityIdForName("Aurangabad")).toBe("sambhajinagar");
     expect(cityIdForName("Gotham")).toBeUndefined();
   });
 });

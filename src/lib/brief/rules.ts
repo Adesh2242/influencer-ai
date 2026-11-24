@@ -28,7 +28,6 @@ import {
   DELIVERABLES,
   DELIVERABLE_LIST,
   GOALS,
-  HINDI_BELT_ALIASES,
   LANGUAGES,
   LANGUAGE_CODES,
   NICHES,
@@ -186,7 +185,6 @@ interface Ctx {
   notes: string[];
   /** A per-creator fee waits here until the creator count is known. */
   perCreator?: Amount;
-  hindiBelt: boolean;
 }
 
 function normalise(text: string): string {
@@ -209,7 +207,7 @@ export function parseBriefWithRules(text: string): ParsedBrief {
     const lower = orig.toLowerCase();
     // toLowerCase can change the length of a few exotic characters; keep indices aligned or bail out
     // of the index-sensitive stages by working on the lowercased text alone.
-    const ctx: Ctx = { orig: lower.length === orig.length ? orig : lower, work: lower, brief: {}, notes: [], hindiBelt: false };
+    const ctx: Ctx = { orig: lower.length === orig.length ? orig : lower, work: lower, brief: {}, notes: [] };
 
     detectMoney(ctx);
     detectCreatorCount(ctx);
@@ -617,22 +615,18 @@ function detectGeo(ctx: Ctx): void {
     if (findAny(ctx.work, [...aliases, ...extras])) addTiers(ctx, [tier]);
   }
 
-  // Regions
-  const hindiBelt = findAny(ctx.work, HINDI_BELT_ALIASES) !== null;
-  if (hindiBelt) {
-    addRegions(ctx, ["north", "central"]);
-    ctx.notes.push("Read the Hindi belt as the North and Central regions.");
-    ctx.work = blankPhrases(ctx.work, HINDI_BELT_ALIASES);
-    ctx.hindiBelt = true;
-  }
+  // Divisions of Maharashtra. A brief naming the whole state targets nothing in particular, which
+  // is correct: the catalogue is Maharashtra, so "pan-Maharashtra" is the absence of a filter.
   const regionExtras: Partial<Record<Region, string[]>> = {
-    south: ["southern states", "south indian states", "down south"],
-    north: ["northern states", "north indian states"],
-    east: ["eastern states"],
-    west: ["western states"],
+    mumbai_metro: ["mumbai metropolitan region", "mumbai metro", "greater mumbai", "mmr region"],
+    western: ["pune belt", "sugar belt", "western ghats belt"],
+    north: ["khandesh", "north maharashtra belt", "nashik belt"],
+    marathwada: ["marathwada region", "aurangabad belt"],
+    vidarbha: ["vidarbha region", "nagpur belt", "east maharashtra"],
+    konkan: ["konkan belt", "coastal belt", "coastal maharashtra"],
   };
-  // Northeast first so "north east India" is not also read as East.
-  const regionOrder: Region[] = ["northeast", ...REGION_LIST.filter((r) => r !== "northeast")];
+  // Longest-named divisions first, so "Mumbai Metropolitan" is not consumed by a bare "Mumbai".
+  const regionOrder: Region[] = ["mumbai_metro", ...REGION_LIST.filter((r) => r !== "mumbai_metro")];
   for (const region of regionOrder) {
     const phrases = [...REGIONS[region].aliases, ...(regionExtras[region] ?? [])];
     if (findAny(ctx.work, phrases)) {
@@ -641,7 +635,8 @@ function detectGeo(ctx: Ctx): void {
     }
   }
 
-  // States add their region. Phrases that are also city names (Delhi, Puducherry) count as cities.
+  // A district adds its division. Phrases that are also city names (Pune, Nagpur) count as cities,
+  // so naming Pune targets the city and naming Satara targets Western Maharashtra.
   const cityTerms = new Set(CITIES.flatMap((c) => [c.name.toLowerCase(), ...c.aliases]));
   const states: { name: string; region: Region; index: number }[] = [];
   for (const state of STATES) {
@@ -716,9 +711,11 @@ function detectLanguages(ctx: Ctx): void {
   if (findPhrase(work, "hinglish")) ctx.notes.push('Read "Hinglish" as Hindi + English.');
   if (hits.length > 0) {
     ctx.brief.languages = hits.sort((a, b) => a.index - b.index).map((h) => h.code);
-  } else if (ctx.hindiBelt) {
-    ctx.brief.languages = ["hi"];
-    ctx.notes.push("Suggested Hindi for the Hindi belt; change it if you need other languages.");
+  } else if ((ctx.brief.targetRegions ?? []).some((region) => region !== "mumbai_metro")) {
+    // Outside the Mumbai metro belt, Marathi is the working language of the audience and of the
+    // creators worth booking. Suggesting it is the single most useful default this parser has.
+    ctx.brief.languages = ["mr"];
+    ctx.notes.push("Suggested Marathi, which is what works outside the Mumbai belt; change it if you need Hindi or English.");
   }
   if (findAny(work, ["regional languages", "regional language", "vernacular", "bhasha"]) && hits.length === 0) {
     ctx.notes.push("The brief mentions regional languages: pick the specific languages to filter creators.");

@@ -46,13 +46,13 @@ describe("sign-up form options", () => {
       const labels = group.options.map((option) => option.label);
       expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "en-IN")));
     }
-    expect(values).toContain("Coimbatore, Tamil Nadu");
-    expect(values).toContain("Delhi");
+    expect(values).toContain("Kolhapur, Maharashtra");
+    expect(values).toContain("Mumbai, Maharashtra");
   });
 
   it("shows languages with their native names", () => {
     expect(LANGUAGE_OPTIONS).toHaveLength(LANGUAGE_CODES.length);
-    expect(LANGUAGE_OPTIONS).toContainEqual({ value: "Tamil", label: "Tamil (தமிழ்)" });
+    expect(LANGUAGE_OPTIONS).toContainEqual({ value: "Marathi", label: "Marathi (मराठी)" });
     expect(LANGUAGE_OPTIONS).toContainEqual({ value: "English", label: "English" });
   });
 

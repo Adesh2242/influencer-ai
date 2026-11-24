@@ -102,12 +102,12 @@ const MARATHI_NICHE: Record<Niche, string> = {
 };
 
 const MARATHI_REGION: Record<Region, string> = {
-  north: "उत्तर",
-  south: "दक्षिण",
-  east: "पूर्व",
-  west: "पश्चिम",
-  central: "मध्य",
-  northeast: "ईशान्य",
+  mumbai_metro: "मुंबई महानगर",
+  western: "पश्चिम महाराष्ट्र",
+  north: "उत्तर महाराष्ट्र",
+  marathwada: "मराठवाडा",
+  vidarbha: "विदर्भ",
+  konkan: "कोकण",
 };
 
 /** The advertising-disclosure reminder (ASCI influencer guidelines) included in every draft. */
@@ -220,9 +220,9 @@ function fitFacts(creator: Creator, brief: CampaignBrief, platform: Platform): P
     const regions = REGION_LIST.filter((region) => brief.targetRegions.includes(region));
     const labels = regions.map((region) => REGIONS[region].label);
     facts.push({
-      en: `${formatShare(regionShare)} of your audience is in ${joinList(labels, "and")} India`,
-      hinglish: `aapki ${formatShare(regionShare)} audience ${joinList(labels, "aur")} India mein hai`,
-      mr: `तुमचे ${formatShare(regionShare)} प्रेक्षक ${joinList(regions.map((region) => MARATHI_REGION[region]), "आणि")} भारतात आहेत`,
+      en: `${formatShare(regionShare)} of your audience is in ${joinList(labels, "and")}`,
+      hinglish: `aapki ${formatShare(regionShare)} audience ${joinList(labels, "aur")} mein hai`,
+      mr: `तुमचे ${formatShare(regionShare)} प्रेक्षक ${joinList(regions.map((region) => MARATHI_REGION[region]), "आणि")} येथे आहेत`,
     });
   } else if (tierPhrase && tierShare >= 0.35) {
     facts.push({

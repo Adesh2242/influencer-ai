@@ -85,7 +85,7 @@ function ExampleBrief() {
     <figure className="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
       <figcaption className="text-xs font-medium text-slate-500">For example</figcaption>
       <blockquote className="mt-1 text-sm italic text-slate-700">
-        “Diwali campaign ke liye Hindi belt ke 10 micro fashion creators chahiye, budget 8 lakh.”
+        “Diwali campaign ke liye Marathwada ke 10 micro fashion creators chahiye, budget 8 lakh.”
       </blockquote>
     </figure>
   );
@@ -345,9 +345,9 @@ export default function HomePage() {
       <Section aria-labelledby="india-title" className="bg-gradient-to-b from-saffron-50/70 to-slate-50">
         <SectionHeading
           id="india-title"
-          eyebrow="Built for India"
-          title="Made for Bharat, not just the metros"
-          description="Brief in Hinglish, target the Hindi belt or the Northeast, filter by city tier and plan in lakh and crore. Moj and ShareChat sit alongside Instagram and YouTube."
+          eyebrow="Built for Maharashtra"
+          title="One state, properly covered"
+          description="Brief in Marathi, Hinglish or English, target Vidarbha or Marathwada rather than &ldquo;West India&rdquo;, and plan in lakh and crore. Every creator here is based in Maharashtra, so reach outside the state is a cost, not a bonus."
         />
         <IndiaCoverage className="mt-10" />
       </Section>

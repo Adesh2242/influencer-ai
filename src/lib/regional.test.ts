@@ -115,7 +115,7 @@ describe("sub-regions", () => {
   });
 
   it("returns nothing for an unknown city", () => {
-    expect(subRegionOf("delhi")).toBeUndefined();
+    expect(subRegionOf("not-in-maharashtra")).toBeUndefined();
     expect(subRegionOf(undefined)).toBeUndefined();
   });
 

@@ -12,11 +12,11 @@ const FULL_BRIEF: CampaignBrief = mergeBrief(DEFAULT_BRIEF, {
   productCategory: "skincare",
   description: "Vitamin C serum and sunscreen launch for women in South India.",
   niches: ["beauty"],
-  languages: ["ta", "te"],
+  languages: ["mr", "hi"],
   platforms: ["instagram", "youtube"],
   targetGender: "female",
   targetAges: ["18-24", "25-34"],
-  targetRegions: ["south"],
+  targetRegions: ["western"],
   budgetINR: 300_000,
   creatorsWanted: 8,
 });
@@ -203,7 +203,7 @@ describe("matchCreators", () => {
 describe("constraints a buyer cannot trade away", () => {
   const southBrief: CampaignBrief = mergeBrief(DEFAULT_BRIEF, {
     niches: ["beauty"],
-    languages: ["ta", "te"],
+    languages: ["mr", "hi"],
     budgetINR: 3_00_000,
     creatorsWanted: 8,
     platforms: [],
@@ -211,14 +211,14 @@ describe("constraints a buyer cannot trade away", () => {
   });
 
   it("excludes a creator who costs more than the entire campaign", () => {
-    const dear = creators.find((c) => c.rates.reel > 3_00_000 && c.languages.includes("ta"));
+    const dear = creators.find((c) => c.rates.reel > 3_00_000 && c.languages.includes("mr"));
     if (!dear) return;
     const result = scoreCreator(southBrief, dear);
     expect(result.excludedReason).toMatch(/more than your entire/);
   });
 
   it("excludes a creator who publishes in none of the briefed languages", () => {
-    const marathi = creators.find((c) => !c.languages.some((l) => ["ta", "te"].includes(l)));
+    const marathi = creators.find((c) => !c.languages.some((l) => ["mr", "hi"].includes(l)));
     expect(marathi).toBeDefined();
     const result = scoreCreator(southBrief, marathi!);
     expect(result.excludedReason).toMatch(/^Publishes in /);
@@ -239,7 +239,7 @@ describe("constraints a buyer cannot trade away", () => {
   });
 
   it("leaves nothing eligible for a brief this catalogue cannot serve", () => {
-    const { results, excluded } = matchCreators(southBrief, creators.filter((c) => !c.languages.includes("ta") && !c.languages.includes("te")));
+    const { results, excluded } = matchCreators(southBrief, creators.filter((c) => !c.languages.includes("mr") && !c.languages.includes("hi")));
     expect(results).toHaveLength(0);
     expect(excluded.length).toBeGreaterThan(0);
     expect(excluded.every((r) => r.excludedReason !== null)).toBe(true);

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AI_FALLBACK_NOTE, parseBrief } from "./client";
 
-const TEXT = "Skincare launch for women 18-34 in Chennai, budget ₹3 lakh";
+const TEXT = "Skincare launch for women 18-34 in Pune, budget ₹3 lakh";
 
 function respond(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
@@ -35,7 +35,7 @@ describe("parseBrief", () => {
     expect(result.source).toBe("rules");
     expect(result.notes[0]).toBe(AI_FALLBACK_NOTE);
     expect(result.brief.budgetINR).toBe(300_000);
-    expect(result.brief.targetCityIds).toEqual(["chennai"]);
+    expect(result.brief.targetCityIds).toEqual(["pune"]);
   });
 
   it("falls back after the 25 second timeout", async () => {

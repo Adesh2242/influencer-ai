@@ -31,16 +31,16 @@ export function IndiaCoverage({ className }: { className?: string }) {
         </h3>
         {hasData ? (
           <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <CoverageStat label="Creators" value={formatNumber(coverage.creators)} hint="from YouTube" />
+            <CoverageStat label="Creators" value={formatNumber(coverage.creators)} hint="in Maharashtra, from YouTube" />
             <CoverageStat
               label="Languages"
               value={formatNumber(coverage.languages)}
-              hint={`of ${LANGUAGE_CODES.length} supported`}
+              hint="Marathi, Hindi and English"
             />
             <CoverageStat
               label="Cities"
               value={formatNumber(coverage.cities)}
-              hint={`${formatNumber(coverage.nonMetroCities)} in tier 2 and 3`}
+              hint={`across Maharashtra, ${formatNumber(coverage.nonMetroCities)} outside Mumbai and Pune`}
             />
             <CoverageStat label="Niches" value={formatNumber(coverage.niches)} hint={`of ${NICHES.length} categories`} />
           </dl>
@@ -52,7 +52,7 @@ export function IndiaCoverage({ className }: { className?: string }) {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-slate-700">{LANGUAGE_CODES.length} content languages, in their own scripts</h3>
+        <h3 className="text-sm font-semibold text-slate-700">Content languages, in their own scripts</h3>
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {LANGUAGE_CODES.map((code) => {
             const { label, native } = LANGUAGES[code];

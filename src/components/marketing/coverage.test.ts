@@ -18,7 +18,7 @@ function makeCreator(overrides: Partial<Creator>): Creator {
       gender: { female: 0.5, male: 0.5 },
       age: { "13-17": 0, "18-24": 0.5, "25-34": 0.5, "35-44": 0, "45+": 0 },
       tiers: { 1: 1, 2: 0, 3: 0 },
-      regions: { north: 0, south: 0, east: 0, west: 1, central: 0, northeast: 0 },
+      regions: { mumbai_metro: 1, western: 0, north: 0, marathwada: 0, vidarbha: 0, konkan: 0 },
       topCities: [],
       languages: [],
     },
@@ -46,18 +46,18 @@ describe("computeCoverage", () => {
   it("counts distinct languages, known home cities and niches", () => {
     const coverage = computeCoverage([
       makeCreator({ id: "a", homeCityId: "mumbai", languages: ["hi", "en"], niches: ["food", "travel"] }),
-      makeCreator({ id: "b", homeCityId: "coimbatore", languages: ["ta", "en"], niches: ["food"] }),
-      makeCreator({ id: "c", homeCityId: "coimbatore", languages: ["ta", "ta"], niches: ["tech"] }),
-      makeCreator({ id: "d", homeCityId: "not-a-city", languages: ["as"], niches: ["devotional"] }),
+      makeCreator({ id: "b", homeCityId: "kolhapur", languages: ["mr", "en"], niches: ["food"] }),
+      makeCreator({ id: "c", homeCityId: "kolhapur", languages: ["mr", "hi"], niches: ["tech"] }),
+      makeCreator({ id: "d", homeCityId: "not-a-city", languages: ["en"], niches: ["devotional"] }),
     ]);
 
     expect(coverage.creators).toBe(4);
-    expect(coverage.languages).toBe(4);
+    expect(coverage.languages).toBe(3);
     expect(coverage.cities).toBe(2);
     expect(coverage.nonMetroCities).toBe(1);
     expect(coverage.niches).toBe(4);
-    expect(coverage.creatorsByLanguage.ta).toBe(2);
-    expect(coverage.creatorsByLanguage.en).toBe(2);
-    expect(coverage.creatorsByLanguage.bn).toBe(0);
+    expect(coverage.creatorsByLanguage.mr).toBe(2);
+    expect(coverage.creatorsByLanguage.en).toBe(3);
+    expect(coverage.creatorsByLanguage.hi).toBe(2);
   });
 });
