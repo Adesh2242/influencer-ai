@@ -1,7 +1,7 @@
 import { CircleAlert, CircleCheck, Clock, Reply } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/Card";
 import { ScoreRing } from "@/components/ui/Score";
-import { authenticityBand, BAND_LABEL } from "@/lib/ingest/estimate";
+import { authenticityBand, BAND_LABEL, isBrandSafetyAssessed } from "@/lib/ingest/estimate";
 import { formatPercent, formatShare } from "@/lib/format";
 import type { Creator } from "@/types";
 import { plural } from "./helpers";
@@ -29,6 +29,7 @@ function Flags({ flags, clean }: { flags: string[]; clean: string }) {
 
 export function TrustSection({ creator }: { creator: Creator }) {
   const { authenticity, brandSafety } = creator;
+  const assessed = isBrandSafetyAssessed(brandSafety);
 
   return (
     <Card>
@@ -58,10 +59,26 @@ export function TrustSection({ creator }: { creator: Creator }) {
         </div>
 
         <div className="flex items-start gap-4">
-          <ScoreRing score={brandSafety.score} size={64} label="Brand safety" />
+          {assessed ? (
+            <ScoreRing score={brandSafety.score} size={64} label="Brand safety" />
+          ) : (
+            <div
+              className="flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xs font-semibold text-slate-400"
+              aria-label="Brand safety not assessed"
+            >
+              n/a
+            </div>
+          )}
           <div className="min-w-0 space-y-2">
             <h3 className="text-sm font-semibold text-slate-900">Brand safety</h3>
-            <Flags flags={brandSafety.flags} clean="No brand-safety concerns in recent content." />
+            {assessed ? (
+              <Flags flags={brandSafety.flags} clean="No brand-safety concerns in recent content." />
+            ) : (
+              <p className="text-sm text-slate-600">
+                Not assessed. Nothing here has watched this creator&rsquo;s videos or read their comments, so
+                treat brand safety as an open question and review a few recent uploads before you sign.
+              </p>
+            )}
           </div>
         </div>
 

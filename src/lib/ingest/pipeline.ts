@@ -16,9 +16,10 @@ import type { Creator, LanguageCode, Platform } from "../../types";
 import { detectMaharashtra, type LocationConfidence, type LocationVerdict } from "./location";
 import { computeMetrics, median, recentVideos, type ChannelMetrics } from "./metrics";
 import { buildContentProfile, topicsFrom, type ContentProfile } from "./content";
-import { estimateAuthenticity } from "./estimate";
+import { estimateAuthenticity, BRAND_SAFETY_NOT_ASSESSED } from "./estimate";
 import { rateCardFor } from "../pricing";
 import { classifyNiches } from "./niche";
+import { commercialStatus } from "./commercial";
 import { safeSlice } from "../text";
 import { YOUTUBE_PROVENANCE, type ProvenanceMap, type SourceRecord } from "./provenance";
 import {
@@ -241,7 +242,10 @@ export function toCreator(
       primaryPlatform: platform,
     }),
     authenticity,
-    brandSafety: { score: 80, flags: [] },
+    // Not assessed. Nothing in this pipeline reads a creator's content for brand safety, and a
+    // score of 80 with an empty flag list was rendering as "No brand-safety concerns in recent
+    // content" — an assurance about a real person that nobody had checked.
+    brandSafety: { score: 0, flags: [BRAND_SAFETY_NOT_ASSESSED] },
     rates: { reel: 0, story: 0, post: 0, video: null },
     collaborations: [],
     responseRate: 0.5,
@@ -351,6 +355,16 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
     }
     if (channel.subscriberCount < minSubscribers) {
       reject(`under ${minSubscribers} subscribers`);
+      continue;
+    }
+
+    // A monastery, a news desk or a municipal handle is not inventory a brand can book. Keeping
+    // them out here is cheaper than filtering them downstream and stops a "Draft outreach" button
+    // ever appearing beside an ordained monk.
+    const bio = safeSlice(channel.description.split("\n")[0] ?? "", 0, 280);
+    const commercial = commercialStatus({ name: channel.title, handle: channel.customUrl, bio });
+    if (!commercial.bookable) {
+      reject(`${commercial.kind} account, not bookable (matched "${commercial.matched}")`);
       continue;
     }
 

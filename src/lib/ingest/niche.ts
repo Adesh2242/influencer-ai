@@ -1,3 +1,4 @@
+import { containsWord } from "../text";
 // Maps a YouTube channel onto the app's niche taxonomy.
 //
 // YouTube's topicDetails gives Wikipedia category URLs, which are free and reliable but very coarse
@@ -56,6 +57,7 @@ const NICHE_KEYWORDS: Record<Niche, string[]> = {
   sports: ["cricket", "kabaddi", "sports", "क्रिकेट", "कबड्डी"],
 };
 
+
 function topicIdFromUrl(url: string): string {
   return url.split("/wiki/")[1] ?? "";
 }
@@ -72,7 +74,9 @@ export function classifyNiches(input: { text: string; topicCategories: string[] 
 
   for (const [niche, words] of Object.entries(NICHE_KEYWORDS) as [Niche, string[]][]) {
     for (const word of words) {
-      if (text.includes(word.toLowerCase())) add(niche, 2);
+      // Whole words only. Substring matching let "auto" fire inside unrelated words and "car"
+      // inside "scar" or "carnival", which is how an ascetic monk acquired an Auto & EVs tag.
+      if (containsWord(text, word.toLowerCase())) add(niche, 2);
     }
   }
 

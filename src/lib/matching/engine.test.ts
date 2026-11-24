@@ -245,3 +245,32 @@ describe("constraints a buyer cannot trade away", () => {
     expect(excluded.every((r) => r.excludedReason !== null)).toBe(true);
   });
 });
+
+describe("accounts a brand cannot book", () => {
+  // The EV brief that scored an ordained Buddhist monk 90/100 and offered to draft his outreach.
+  const evBrief = brief({
+    brandName: "Hawabaaz Electric",
+    productCategory: "electric scooters",
+    niches: ["automotive"],
+    budgetINR: 1_000_000,
+  });
+
+  it("never returns an ordained monastic, whatever they score on everything else", () => {
+    const monk = { ...creators[0]!, name: "Bhikkhu Gyanjyoti", handle: "@bhikkhugyanjyoti", niches: ["automotive" as const] };
+    const { results, excluded } = matchCreators(evBrief, [monk]);
+
+    expect(results).toHaveLength(0);
+    expect(excluded[0]?.excludedReason).toMatch(/ordained/);
+  });
+
+  it("offers no way to relax the exclusion, because it is not a preference", () => {
+    const monk = { ...creators[0]!, name: "Bhadant Rahul", handle: "@bhadantrahul" };
+    const { excluded } = matchCreators(evBrief, [monk]);
+    expect(excluded).toHaveLength(1);
+  });
+
+  it("leaves ordinary creators alone", () => {
+    const { results } = matchCreators(brief({}), [{ ...creators[0]!, name: "Sneha Acharya", handle: "@snehaacharya" }]);
+    expect(results).toHaveLength(1);
+  });
+});

@@ -36,6 +36,8 @@ import type {
   ScoreKey,
   ScoreWeights,
 } from "../../types";
+import { statusOf } from "../ingest/commercial";
+import { BRAND_SAFETY_NOT_ASSESSED } from "../ingest/estimate";
 import { briefTextProfile, creatorTextProfile, sharedKeywords, textSimilarity, type TextProfile } from "./text";
 
 export const DEFAULT_WEIGHTS: ScoreWeights = {
@@ -541,6 +543,11 @@ function exclusionReason(creator: Creator, context: BriefContext, choice: Return
   if (brief.minEngagementRate > 0 && stats.engagementRate < brief.minEngagementRate) {
     return `${plainPercent(stats.engagementRate)} engagement on ${platformLabel(stats.platform)} is below your ${plainPercent(brief.minEngagementRate)} minimum`;
   }
+  // Accounts that are not inventory. Ranking a monastic or a news desk produces a confident,
+  // well-formatted recommendation that nobody can act on.
+  const commercial = statusOf(creator);
+  if (!commercial.bookable) return commercial.reason ?? "Not a bookable creator account";
+
   const competitor = competitorWork(creator, context, 6);
   if (competitor) return `Worked with ${competitor.brand} ${monthsAgo(competitor.monthsAgo)} (competitor)`;
 
@@ -592,7 +599,12 @@ function warningsFor(creator: Creator, context: BriefContext, estimate: Estimate
   const pastCompetitor = competitorWork(creator, context, 12, 6);
   if (pastCompetitor) warnings.push(`Worked with ${pastCompetitor.brand} ${monthsAgo(pastCompetitor.monthsAgo)} (competitor)`);
   for (const flag of creator.authenticity.flags) warnings.push(`Authenticity: ${flag}`);
-  for (const flag of creator.brandSafety.flags) warnings.push(`Brand safety: ${flag}`);
+  // "Not assessed" is true of every ingested creator, so as a per-creator warning it is noise that
+  // trains people to ignore the warning list. The profile says it plainly instead.
+  for (const flag of creator.brandSafety.flags) {
+    if (flag === BRAND_SAFETY_NOT_ASSESSED) continue;
+    warnings.push(`Brand safety: ${flag}`);
+  }
   if (context.perCreatorBudget > 0 && estimate.cost > context.perCreatorBudget) {
     warnings.push(
       `${formatINRCompact(estimate.cost)} per ${DELIVERABLE_NOUN[context.brief.deliverable].one} is ${(estimate.cost / context.perCreatorBudget).toFixed(1)}x your ${formatINRCompact(context.perCreatorBudget)} per-creator budget`,

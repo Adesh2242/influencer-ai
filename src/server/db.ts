@@ -6,6 +6,7 @@
 // columns carry the indexes, so nothing is lost by keeping the body opaque.
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
+import { commercialStatus, statusOf } from "../lib/ingest/commercial";
 import { wellFormedDeep } from "../lib/text";
 import { MIN_FOLLOWERS, MIN_SAMPLE_FOR_PRICING } from "../lib/ingest/pipeline";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
@@ -64,10 +65,12 @@ create table if not exists creators (
 alter table creators add column if not exists hashtags        text[]       not null default '{}';
 alter table creators add column if not exists video_tags      text[]       not null default '{}';
 alter table creators add column if not exists sponsored_ratio numeric(5,3) not null default 0;
+alter table creators add column if not exists bookable        boolean      not null default true;
 
 create index if not exists creators_followers_idx  on creators (followers desc);
 create index if not exists creators_city_idx       on creators (city_id);
 create index if not exists creators_confidence_idx on creators (location_confidence);
+create index if not exists creators_bookable_idx   on creators (bookable);
 -- GIN indexes so "which creators use #punefood" is a lookup rather than a scan.
 create index if not exists creators_hashtags_idx   on creators using gin (hashtags);
 create index if not exists creators_video_tags_idx on creators using gin (video_tags);
@@ -108,13 +111,30 @@ create table if not exists ingest_runs (
 export async function migrate(client?: PoolClient): Promise<void> {
   const runner = client ?? getPool();
   await runner.query(SCHEMA);
+  await reconcileBookable(runner);
+}
+
+/**
+ * Rows stored before the bookable check existed default to true, and some of them are monasteries,
+ * news desks and municipal handles — one was offered as a 90/100 match for an electric scooter
+ * brief. The check cannot be expressed in SQL, so the stored names are re-read once on boot. One
+ * pass over a few thousand rows, idempotent, and it only ever narrows the catalogue.
+ */
+async function reconcileBookable(runner: { query: Pool["query"] }): Promise<void> {
+  const { rows } = await runner.query<{ id: string; name: string; handle: string; bio: string | null }>(
+    "select id, name, handle, record->>'bio' as bio from creators where bookable",
+  );
+  const unbookable = rows.filter((row) => !commercialStatus({ name: row.name, handle: row.handle, bio: row.bio ?? "" }).bookable);
+  if (unbookable.length === 0) return;
+  await runner.query("update creators set bookable = false where id = any($1)", [unbookable.map((row) => row.id)]);
+  console.log(`[db] marked ${unbookable.length} stored account(s) as not bookable: ${unbookable.slice(0, 5).map((r) => r.name).join(", ")}`);
 }
 
 const UPSERT = `insert into creators (
   id, platform, external_id, name, handle, city_id, location_confidence, marathi_content,
   followers, avg_views, engagement_rate, authenticity_score, niches, hashtags, video_tags,
-  sponsored_ratio, fetched_at, record
-) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+  sponsored_ratio, fetched_at, record, bookable
+) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 on conflict (id) do update set
   name = excluded.name,
   handle = excluded.handle,
@@ -130,7 +150,8 @@ on conflict (id) do update set
   video_tags = excluded.video_tags,
   sponsored_ratio = excluded.sponsored_ratio,
   fetched_at = excluded.fetched_at,
-  record = excluded.record`;
+  record = excluded.record,
+  bookable = excluded.bookable`;
 
 /**
  * Replaces the stored copy of each creator. An ingestion re-run refreshes figures in place rather
@@ -175,6 +196,7 @@ export async function upsertCreators(records: SourcedCreator[]): Promise<UpsertR
           source.fetchedAt,
           // Platform text can hold a lone surrogate, which Postgres rejects as invalid JSON.
           JSON.stringify(wellFormedDeep(record)),
+          statusOf(creator).bookable,
         ]);
         // Append-only history. Re-running on the same day is a no-op rather than a duplicate.
         await client.query(
@@ -230,6 +252,7 @@ export async function listCreators(query: CreatorQuery = {}): Promise<SourcedCre
   let sql = `select record from creators
      where location_confidence = any($1)
        and followers >= $2
+       and bookable
        and coalesce((record->'metrics'->>'sampleSize')::int, ${MIN_SAMPLE_FOR_PRICING}) >= ${MIN_SAMPLE_FOR_PRICING}`;
   if (query.cityId) {
     params.push(query.cityId);

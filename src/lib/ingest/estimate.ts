@@ -99,3 +99,16 @@ export function estimateAuthenticity(
 
   return { score, dormantSubscriberPct, flags };
 }
+
+/**
+ * Brand safety is a human judgement about a real person's recent content. Nothing in this codebase
+ * makes it: there is no transcript review, no comment sweep, no advertiser-category check. The
+ * pipeline used to store a flat score of 80 with no flags, which the profile rendered as "No
+ * brand-safety concerns in recent content" — an assurance about a named individual that nobody had
+ * checked. The honest value is this one, and the UI shows it as unassessed rather than as a score.
+ */
+export const BRAND_SAFETY_NOT_ASSESSED = "Not assessed: no brand-safety review has been run on this creator.";
+
+export function isBrandSafetyAssessed(brandSafety: { score: number; flags: string[] }): boolean {
+  return !brandSafety.flags.includes(BRAND_SAFETY_NOT_ASSESSED);
+}

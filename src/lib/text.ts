@@ -38,3 +38,33 @@ export function wellFormedDeep<T>(value: T): T {
   }
   return value;
 }
+
+const BOUNDARY = "[^\\p{L}\\p{N}]";
+
+// These run inside the matching loop, over the whole catalogue, so the compiled form is kept.
+// Building a RegExp per word per creator per match was enough on its own to blow the engine's
+// 15 ms budget for a full-dataset match.
+const wordCache = new Map<string, RegExp>();
+const leadingCache = new Map<string, RegExp>();
+
+function cached(cache: Map<string, RegExp>, needle: string, build: (escaped: string) => string): RegExp {
+  let re = cache.get(needle);
+  if (!re) {
+    re = new RegExp(build(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "iu");
+    cache.set(needle, re);
+  }
+  return re;
+}
+
+/**
+ * Whole-word containment. Substring matching is how an ascetic monk acquired an "Auto & EVs" tag:
+ * "auto" sits inside unrelated words, "car" inside "Ambedkarite", "ev" inside "achievement".
+ */
+export function containsWord(haystack: string, needle: string): boolean {
+  return cached(wordCache, needle, (escaped) => `(?:^|${BOUNDARY})${escaped}(?:$|${BOUNDARY})`).test(haystack);
+}
+
+/** True when `needle` is the first word of `haystack` — the position an honorific occupies. */
+export function startsWithWord(haystack: string, needle: string): boolean {
+  return cached(leadingCache, needle, (escaped) => `^${BOUNDARY}*${escaped}(?:$|${BOUNDARY})`).test(haystack.trim());
+}

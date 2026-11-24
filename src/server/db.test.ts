@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SCHEMA } from "./db";
 
@@ -65,5 +66,25 @@ describe("the follower floor", () => {
       fs.readFileSync(new URL("./db.ts", import.meta.url), "utf8"),
     );
     expect(source).toContain("followers >= $2");
+  });
+});
+
+describe("accounts that are not inventory", () => {
+  const source = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
+
+  it("declares bookable as an additive alter, not only in the create body", () => {
+    // The hashtags outage: a column added to `create table if not exists` never reaches a database
+    // that already exists, and the deploy then crashes on the missing column.
+    expect(SCHEMA).toContain("add column if not exists bookable");
+  });
+
+  it("filters unbookable accounts out of the serving query", () => {
+    expect(source).toMatch(/and bookable/);
+  });
+
+  it("re-reads stored names on boot, since the check cannot run in SQL", () => {
+    expect(source).toContain("reconcileBookable");
+    // It must only ever narrow: a row already marked false stays false.
+    expect(source).toContain("from creators where bookable");
   });
 });
