@@ -74,6 +74,7 @@ export type ExclusionKind =
   | "language"
   | "budget"
   | "notBookable"
+  | "noDeal"
   | "other";
 
 // Mirrors the sentences produced by exclusionReason() in lib/matching/engine.ts.
@@ -87,6 +88,7 @@ const EXCLUSION_PATTERNS: [ExclusionKind, RegExp][] = [
   ["language", /^Publishes in /],
   ["budget", /is more than your entire /],
   ["notBookable", /^Appears to be |^Not a bookable creator/],
+  ["noDeal", /cannot both be true|worth either side's paperwork|negotiates down/],
 ];
 
 export function exclusionKind(reason: string): ExclusionKind {
@@ -120,6 +122,13 @@ function relaxFor(kind: ExclusionKind, brief: CampaignBrief): Omit<ExclusionGrou
         suggestion: "They publish in a language your brief does not ask for.",
         relax: { languages: [] },
         relaxLabel: "Accept any language",
+      };
+    case "noDeal":
+      return {
+        suggestion:
+          "There is no fee both sides would agree to: their subscriber count and their actual views are too far apart.",
+        relax: null,
+        relaxLabel: "",
       };
     case "notBookable":
       return {

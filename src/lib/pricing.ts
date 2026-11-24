@@ -108,6 +108,50 @@ export function sellableReach(views: number, followers: number): number {
  */
 export const FAIR_VALUE_CEILING = 3;
 
+/**
+ * Below this, a branded booking is not a transaction anyone completes: the brief, the revisions and
+ * the invoice cost more than the fee. Figures are per format, for the Maharashtra market.
+ */
+export const MIN_VIABLE_FEE: Record<Deliverable, number> = {
+  video: 1_500,
+  reel: 1_000,
+  post: 750,
+  story: 500,
+};
+
+/**
+ * A channel whose median views fall below this share of its subscriber count is telling two
+ * stories that cannot both be true. Above roughly a lakh of subscribers, a real audience does not
+ * go this quiet: the subscribers were bought, or the channel has been abandoned and the counter is
+ * a fossil. Either way there is nothing here to price, and a fee computed off the views is a number
+ * with no meaning rather than a bargain.
+ */
+export const MIN_VIEW_RATE = 0.005;
+/**
+ * The catalogue's own follower floor, so the coherence rule covers every creator in it. Scoping it
+ * to large channels left a gap at the small end: a 10,000-subscriber channel with 30 median views
+ * passed, was floored to the minimum fee, and came out at ₹32,609 per thousand views — a quote
+ * nobody would write. Half a percent of 10,000 is 50 views, which is not a demanding bar.
+ */
+export const VIEW_RATE_APPLIES_ABOVE = 10_000;
+
+/**
+ * Above this multiple of what the reach is worth, a creator is expensive and the buyer decides
+ * whether to pay or walk. The verdict and the negotiation note put the number in front of them;
+ * hiding them would remove creators a buyer could legitimately choose to pursue.
+ */
+export const EXPENSIVE_GAP = 4;
+
+/**
+ * Above this, it stops being a negotiation. A creator with 9,59,000 subscribers will open near
+ * ₹60,000; if their videos deliver 9,148 views, the reach is worth about ₹1,500. Nobody comes down
+ * forty-fold, and a plan that budgets ₹1,500 for them is fiction. The absolute floor below is
+ * deliberately low, because ₹2,400 for a genuine 12,000-subscriber creator is an ordinary
+ * Maharashtra booking — what makes the figure absurd is the distance from the creator's standing,
+ * not the number of rupees.
+ */
+export const UNBRIDGEABLE_GAP = 10;
+
 
 /**
  * Rupee fees are quoted in round numbers, coarser as they get larger. The floor is per-format so
@@ -135,6 +179,15 @@ export interface RateWorking {
 export interface RateEstimate {
   /** What the reach is worth, in rupees, for the given deliverable. */
   fairValue: number;
+  /**
+   * False when there is no price at which this booking happens, and `blocker` says why. The
+   * arithmetic still produces a number in these cases, and that number is the problem: a creator
+   * with 20,60,000 subscribers and 26 median views was being quoted ₹1,500, and a 9,59,000-
+   * subscriber motovlogger ₹1,500, figures neither of them would answer. A plan costed on fees
+   * nobody will accept falls apart on first contact, so the product has to say so instead.
+   */
+  viable: boolean;
+  blocker: string | null;
   /** What the creator is likely to quote, from their follower count. */
   likelyAsk: number;
   /** likelyAsk / fairValue. Above 1 means the ask outruns the reach. */
@@ -232,9 +285,23 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
   // "underpriced" would read as a bargain and invite a buyer to overpay for reach that was
   // discounted precisely because it cannot be promised.
   const verdict: RateEstimate["verdict"] =
-    gap >= 4 ? "overpriced" : gap >= 2 ? "stretched" : gap >= 0.8 || capped < modelled ? "fair" : "underpriced";
+    gap >= EXPENSIVE_GAP ? "overpriced" : gap >= 2 ? "stretched" : gap >= 0.8 || capped < modelled ? "fair" : "underpriced";
 
   const effectiveCPM = views > 0 ? Math.round((fairValue / views) * 1000) : 0;
+
+  // Whether a deal exists at all, checked before any of the prose below is believed.
+  const viewRate = followers > 0 ? views / followers : 0;
+  // Only "there is nothing to price here" blocks; "they are expensive" does not.
+  const blocker =
+    followers >= VIEW_RATE_APPLIES_ABOVE && viewRate < MIN_VIEW_RATE
+      ? `${followers.toLocaleString("en-IN")} subscribers but a median of ${views.toLocaleString("en-IN")} views — ` +
+        `${(viewRate * 100).toFixed(2)}% of the audience turns up. Those two figures cannot both be true, so there is nothing here to price.`
+      : fairValue < MIN_VIABLE_FEE[deliverable]
+        ? `The reach supports about ₹${fairValue.toLocaleString("en-IN")}, below the ₹${MIN_VIABLE_FEE[deliverable].toLocaleString("en-IN")} at which a booking is worth either side's paperwork.`
+        : gap >= UNBRIDGEABLE_GAP
+          ? `Will open near ₹${ask.toLocaleString("en-IN")} off ${followers.toLocaleString("en-IN")} subscribers, but ${views.toLocaleString("en-IN")} median views are worth about ₹${fairValue.toLocaleString("en-IN")}. ` +
+            `Nobody negotiates down ${gap.toFixed(0)}×, so budgeting them at ₹${fairValue.toLocaleString("en-IN")} is fiction.`
+          : null;
 
   const note =
     verdict === "overpriced"
@@ -247,7 +314,17 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
             ? `Recent views are far above what ${followers.toLocaleString("en-IN")} subscribers can account for, so most of that reach is YouTube's recommendation engine rather than an audience they bring. ₹${fairValue.toLocaleString("en-IN")} is what the reach they can commit to is worth; treat anything above it as a bet on the algorithm repeating itself.`
             : `Ask and delivered reach line up. ₹${fairValue.toLocaleString("en-IN")} is a fair opening number.`;
 
-  return { fairValue, likelyAsk: ask, gap: Number(gap.toFixed(2)), verdict, effectiveCPM, workings, negotiationNote: note };
+  return {
+    fairValue,
+    viable: blocker === null,
+    blocker,
+    likelyAsk: ask,
+    gap: Number(gap.toFixed(2)),
+    verdict,
+    effectiveCPM,
+    workings,
+    negotiationNote: blocker ?? note,
+  };
 }
 
 /** Full rate card at fair value, for the Creator model. */

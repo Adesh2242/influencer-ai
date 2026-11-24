@@ -79,13 +79,39 @@ describe("rates against the market ranges", () => {
 });
 
 describe("ask versus worth", () => {
-  it("flags a creator whose followers far outrun their views", () => {
-    // Real case: 2.01M subscribers, 3,510 median views.
+  it("refuses to price a creator whose followers far outrun their views", () => {
+    // Real case: 2.01M subscribers, 3,510 median views — 0.17% of the audience turns up. The
+    // worst live example was 20,60,000 subscribers against 26 views, quoted ₹1,500.
     const inflated = creator({ tier: "mega", followers: 2_010_000, avgViews: 3_510, engagementRate: 0.9, authenticity: 40 });
     const rate = estimateRate(inflated, "reel");
-    expect(rate.verdict).toBe("overpriced");
+    expect(rate.viable).toBe(false);
+    expect(rate.blocker).toMatch(/cannot both be true/);
     expect(rate.gap).toBeGreaterThan(10);
-    expect(rate.negotiationNote).toContain("walk");
+  });
+
+  it("will not budget a big creator at a tiny creator's fee", () => {
+    // A real motovlogger: 9,59,000 subscribers, 9,148 median views, previously quoted ₹1,500.
+    const thin = creator({ tier: "macro", followers: 959_000, avgViews: 9_148, engagementRate: 1.2 });
+    const rate = estimateRate(thin, "reel");
+    expect(rate.viable).toBe(false);
+    expect(rate.blocker).toMatch(/Nobody negotiates down/);
+  });
+
+  it("leaves a genuine small creator bookable at a small fee", () => {
+    // ₹2,400 for a real 12,000-subscriber creator is an ordinary Maharashtra booking, not an error.
+    const nano = creator({ tier: "nano", followers: 12_000, avgViews: 2_000, engagementRate: 4 });
+    const rate = estimateRate(nano, "reel");
+    expect(rate.viable).toBe(true);
+    expect(rate.fairValue).toBeGreaterThan(0);
+  });
+
+  it("still prices an expensive creator rather than hiding them", () => {
+    // A wide gap is a negotiation, not a blocker: whether to pay or walk is the buyer's call.
+    const pricey = creator({ tier: "macro", followers: 700_000, avgViews: 40_000, engagementRate: 1.5 });
+    const rate = estimateRate(pricey, "reel");
+    expect(rate.viable).toBe(true);
+    expect(rate.blocker).toBeNull();
+    expect(rate.fairValue).toBeGreaterThan(0);
   });
 
   it("calls it fair when the ask and the reach agree", () => {

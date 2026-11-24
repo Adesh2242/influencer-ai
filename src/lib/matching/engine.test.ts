@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { creators } from "../../test/creatorFixtures";
 import { DEFAULT_BRIEF, mergeBrief } from "../brief/defaults";
 import { DEFAULT_WEIGHTS, SCORE_LABELS, matchCreators, scoreCreator } from "./engine";
+import { estimateRate } from "../pricing";
 import type { CampaignBrief, MatchResult, ScoreKey } from "../../types";
 
 /** A brief with no preferences and no hard filters beyond the defaults' deliverable. */
@@ -34,7 +35,8 @@ describe("scoreCreator hard filters", () => {
   });
 
   it("excludes creators below the minimum authenticity score", () => {
-    const creator = creators.find((c) => c.authenticity.score < 60)!;
+    // Also has to be priceable, or the pricing blocker is the reason that comes back instead.
+    const creator = creators.find((c) => c.authenticity.score < 60 && estimateRate(c, DEFAULT_BRIEF.deliverable).viable)!;
     const result = scoreCreator(brief({ minAuthenticity: 70 }), creator);
     expect(result.excludedReason).toBe(`Authenticity score ${Math.round(creator.authenticity.score)} is below your minimum of 70`);
     expect(scoreCreator(brief({ minAuthenticity: 0 }), creator).excludedReason).toBeNull();
@@ -48,7 +50,7 @@ describe("scoreCreator hard filters", () => {
   });
 
   it("excludes creators outside the requested size tiers", () => {
-    const micro = creators.find((c) => c.tier === "micro")!;
+    const micro = creators.find((c) => c.tier === "micro" && estimateRate(c, DEFAULT_BRIEF.deliverable).viable)!;
     expect(scoreCreator(brief({ creatorTiers: ["nano", "mega"] }), micro).excludedReason).toMatch(
       /^Micro creator \(.+ followers\); you asked for nano or mega creators$/,
     );

@@ -7,6 +7,7 @@ import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CREATOR_TIERS, LANGUAGES } from "@/data/taxonomy";
 import { formatCount, formatINRCompact, formatPercent } from "@/lib/format";
+import { estimateRate } from "@/lib/pricing";
 import { regionalValue } from "@/lib/regional";
 import { cn } from "@/lib/utils";
 import type { Creator } from "@/types";
@@ -22,6 +23,10 @@ export function CreatorCard({ creator }: { creator: Creator }) {
   const ratio = engagementVsBenchmark(creator);
   // Cost per thousand views that land in Maharashtra: the only CPM a regional brand can spend.
   const localCPM = regionalValue(creator, creator.rates.reel).localCPM;
+  // When subscribers and views contradict each other, or the ask is many times what the reach is
+  // worth, there is no fee to print. Showing one anyway is how a 20,60,000-subscriber channel with
+  // 26 median views came to carry a ₹1,500 price tag on this card.
+  const rate = estimateRate(creator, "reel");
 
   return (
     <Card className="flex h-full flex-col">
@@ -44,11 +49,19 @@ export function CreatorCard({ creator }: { creator: Creator }) {
           <ReachReality creator={creator} />
           <LocalReachLine creator={creator} />
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-200/70 pt-2">
-            <Metric
-              label="Reel, worth"
-              value={formatINRCompact(creator.rates.reel)}
-              hint={<span className="text-slate-500">₹{formatCount(localCPM)} per 1,000 in-state</span>}
-            />
+            {rate.viable ? (
+              <Metric
+                label="Reel, worth"
+                value={formatINRCompact(creator.rates.reel)}
+                hint={<span className="text-slate-500">₹{formatCount(localCPM)} per 1,000 in-state</span>}
+              />
+            ) : (
+              <Metric
+                label="Reel, worth"
+                value={<span className="text-slate-400">n/a</span>}
+                hint={<span className="text-amber-700">no fee both sides would sign</span>}
+              />
+            )}
             <Metric
               label="Engagement"
               value={formatPercent(primary?.engagementRate ?? 0)}

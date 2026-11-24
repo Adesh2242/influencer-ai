@@ -37,6 +37,7 @@ import type {
   ScoreWeights,
 } from "../../types";
 import { statusOf } from "../ingest/commercial";
+import { estimateRate } from "../pricing";
 import { BRAND_SAFETY_NOT_ASSESSED } from "../ingest/estimate";
 import { briefTextProfile, creatorTextProfile, sharedKeywords, textSimilarity, type TextProfile } from "./text";
 
@@ -547,6 +548,11 @@ function exclusionReason(creator: Creator, context: BriefContext, choice: Return
   // well-formatted recommendation that nobody can act on.
   const commercial = statusOf(creator);
   if (!commercial.bookable) return commercial.reason ?? "Not a bookable creator account";
+
+  // No price both sides would sign. Ranking these produces a plan that costs out beautifully and
+  // then collapses on first contact, which is worse than a shorter shortlist.
+  const rate = estimateRate(creator, brief.deliverable);
+  if (!rate.viable && rate.blocker) return rate.blocker;
 
   const competitor = competitorWork(creator, context, 6);
   if (competitor) return `Worked with ${competitor.brand} ${monthsAgo(competitor.monthsAgo)} (competitor)`;
