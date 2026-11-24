@@ -122,7 +122,8 @@ export async function migrate(client?: PoolClient): Promise<void> {
  */
 async function reconcileBookable(runner: { query: Pool["query"] }): Promise<void> {
   const { rows } = await runner.query<{ id: string; name: string; handle: string; bio: string | null }>(
-    "select id, name, handle, record->>'bio' as bio from creators where bookable",
+    // The record is a SourcedCreator, so the creator's own fields are nested under 'creator'.
+    "select id, name, handle, record->'creator'->>'bio' as bio from creators where bookable",
   );
   const unbookable = rows.filter((row) => !commercialStatus({ name: row.name, handle: row.handle, bio: row.bio ?? "" }).bookable);
   if (unbookable.length === 0) return;

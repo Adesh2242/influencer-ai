@@ -88,3 +88,22 @@ describe("accounts that are not inventory", () => {
     expect(source).toContain("from creators where bookable");
   });
 });
+
+describe("JSON paths into the stored record", () => {
+  const source = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
+
+  /**
+   * The stored record is a SourcedCreator — `{ creator, source, metrics, content, ... }` — so a
+   * creator's own field sits under `record->'creator'`. A path that forgets that returns null
+   * silently: the query still runs, the column is just always empty, and the check that depends
+   * on it quietly never fires.
+   */
+  it("reaches a creator's own fields through 'creator', not off the root", () => {
+    const paths = [...source.matchAll(/record->(?:'(\w+)'->)*>'(\w+)'/g)].map((m) => m[0]);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      const topLevel = /^record->>'/.test(path);
+      expect(topLevel, `${path} reads off the record root; SourcedCreator has no fields there`).toBe(false);
+    }
+  });
+});
