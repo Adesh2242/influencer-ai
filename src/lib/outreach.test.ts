@@ -8,6 +8,7 @@ import {
   resolveDeliverable,
   type OutreachChannel,
   type OutreachLanguage,
+  defaultOutreachLanguage,
 } from "./outreach";
 import type { CampaignBrief, Creator } from "../types";
 
@@ -67,7 +68,7 @@ const BRIEF: CampaignBrief = {
 
 const ESTIMATE = { platform: "instagram" as const, estimatedCostINR: 38_000 };
 
-const LANGUAGES: OutreachLanguage[] = ["en", "hinglish"];
+const LANGUAGES: OutreachLanguage[] = ["en", "hinglish", "mr"];
 const CHANNELS: OutreachChannel[] = ["email", "dm"];
 
 function expectClean(text: string) {
@@ -96,7 +97,9 @@ describe("buildOutreachMessage", () => {
           expect(message.body).toContain("₹38,000");
           expect(message.body).toContain("GST");
           expect(message.body).toContain("Chennai");
-          expect(message.body).toContain("breakfast cereal campaign");
+          // The brand's own product category is never translated — it is free text they typed.
+          expect(message.body).toContain("breakfast cereal");
+          expect(message.body).toMatch(language === "mr" ? /कॅम्पेन/ : /campaign/);
         });
 
         it("never leaves placeholders or broken values", () => {
@@ -107,12 +110,13 @@ describe("buildOutreachMessage", () => {
         if (channel === "dm") {
           it("has no subject and stays short", () => {
             expect(message.subject).toBeNull();
-            expect(message.body.length).toBeLessThan(700);
+            expect(message.body.length).toBeLessThan(language === "mr" ? 800 : 700);
           });
         } else {
           it("has a subject and a timeline", () => {
             expect(message.subject).toContain("Millet Mornings");
-            expect(message.body).toMatch(language === "en" ? /first draft in about 5 days/ : /5 din mein first draft/);
+            const timeline = { en: /first draft in about 5 days/, hinglish: /5 din mein first draft/, mr: /5 दिवसांत पहिला ड्राफ्ट/ };
+            expect(message.body).toMatch(timeline[language]);
           });
         }
       });
@@ -198,5 +202,93 @@ describe("helpers", () => {
     expect(deliverableName("reel", "youtube")).toBe("YouTube Short");
     expect(deliverableName("reel", "moj")).toBe("Moj short video");
     expect(deliverableName("post", "sharechat")).toBe("ShareChat post");
+  });
+});
+
+/**
+ * Marathi is the default for most of this catalogue, so these cover the things a half-translated
+ * draft gets wrong: an English sentence surviving in the middle of it, a city or niche left in
+ * Latin script, or a postposition left hanging off a word it does not attach to.
+ */
+describe("the Marathi draft", () => {
+  const pune: Creator = {
+    ...CREATOR,
+    name: "Mitali Pawar",
+    homeCityId: "pune",
+    languages: ["mr", "hi"],
+    niches: ["food", "lifestyle"],
+    audience: { ...CREATOR.audience, topCities: [{ cityId: "pune", share: 0.42 }] },
+  };
+  const brief = { ...BRIEF, languages: ["mr" as const], targetCityIds: ["pune"], targetRegions: [] };
+  const draft = (channel: OutreachChannel) =>
+    buildOutreachMessage({ creator: pune, brief, estimate: ESTIMATE, language: "mr", channel });
+
+  it("is written in Devanagari, with no English sentence left in it", () => {
+    const { subject, body } = draft("email");
+    expect(body).toMatch(/[ऀ-ॿ]/);
+    expect(subject).toMatch(/[ऀ-ॿ]/);
+    // The giveaways that the English or Hinglish branch ran instead.
+    expect(body).not.toMatch(/I'm reaching out|Here's what we have in mind|Warm regards/);
+    expect(body).not.toMatch(/\bHum\b|ki taraf se|ke hisaab se/);
+  });
+
+  it("names the city and the niche in Marathi, not in Latin script", () => {
+    const { body } = draft("email");
+    expect(body).toContain("पुणे");
+    expect(body).not.toMatch(/\bPune\b/);
+    expect(body).toContain("खाद्यपदार्थ कंटेंट");
+    expect(body).not.toMatch(/\bFood content\b|\bfood content\b/);
+  });
+
+  it("uses the Marathi word for a professional fee and keeps the rupee figure", () => {
+    const { body } = draft("email");
+    expect(body).toContain("मानधन");
+    expect(body).toContain("₹38,000");
+  });
+
+  it("carries the ASCI disclosure in Marathi", () => {
+    expect(draft("email").body).toContain(asciDisclosureLine("mr", "reel"));
+    expect(asciDisclosureLine("mr", "reel")).toMatch(/मार्गदर्शक तत्त्वांनुसार/);
+    expect(asciDisclosureLine("mr", "reel")).toContain("#ad");
+  });
+
+  it("writes a DM with no subject line", () => {
+    expect(draft("dm").subject).toBeNull();
+  });
+
+  it("holds together when the brand, fee and city are all missing", () => {
+    const anonymous: Creator = { ...pune, name: "", homeCityId: "", gstRegistered: false };
+    const empty = { ...brief, brandName: "", productCategory: "" };
+    for (const channel of CHANNELS) {
+      const { body } = buildOutreachMessage({
+        creator: anonymous,
+        brief: empty,
+        estimate: { platform: "instagram", estimatedCostINR: 0 },
+        channel,
+        language: "mr",
+      });
+      expectClean(body);
+      // No name, so the bare greeting; no brand, so "our brand"; no fee, so it asks for their rate.
+      expect(body).toContain("नमस्कार");
+      expect(body).toContain("आमच्या ब्रँडकडून");
+      expect(body).toContain("आमच्या पुढील कॅम्पेन");
+      expect(body).not.toContain("₹");
+      expect(body).not.toContain("GST");
+      expect(body).toMatch(channel === "email" ? /तुमच्या कोटेशननुसार/ : /तुमचा दर कळवा/);
+    }
+  });
+});
+
+describe("defaultOutreachLanguage", () => {
+  it("opens in Marathi for a creator who publishes in Marathi", () => {
+    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["mr", "hi"] })).toBe("mr");
+  });
+
+  it("opens in Hinglish for a Hindi-only creator, which is how brands write to them", () => {
+    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["hi"] })).toBe("hinglish");
+  });
+
+  it("opens in English otherwise", () => {
+    expect(defaultOutreachLanguage({ ...CREATOR, languages: ["ta", "en"] })).toBe("en");
   });
 });

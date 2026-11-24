@@ -4,11 +4,12 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/misc";
-import { buildOutreachMessage, type OutreachChannel, type OutreachLanguage } from "@/lib/outreach";
+import { buildOutreachMessage, defaultOutreachLanguage, type OutreachChannel, type OutreachLanguage } from "@/lib/outreach";
 import type { CampaignBrief, Creator, MatchResult } from "@/types";
 import { copyText } from "./clipboard";
 
 const LANGUAGE_TABS = [
+  { value: "mr", label: "मराठी" },
   { value: "en", label: "English" },
   { value: "hinglish", label: "Hinglish" },
 ] as const satisfies readonly { value: OutreachLanguage; label: string }[];
@@ -31,7 +32,7 @@ export const OutreachSection = forwardRef<HTMLHeadingElement, OutreachSectionPro
   { creator, brief, estimate },
   headingRef,
 ) {
-  const [language, setLanguage] = useState<OutreachLanguage>("en");
+  const [language, setLanguage] = useState<OutreachLanguage>(() => defaultOutreachLanguage(creator));
   const [channel, setChannel] = useState<OutreachChannel>("email");
   const [status, setStatus] = useState<CopyStatus>("idle");
   const resetTimer = useRef<number | undefined>(undefined);
