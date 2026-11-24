@@ -48,15 +48,14 @@ describe("filterCreators and sortCreators", () => {
 });
 
 describe("sorting a buyer can trust", () => {
-  it("defaults to delivered reach in Maharashtra, not follower count", () => {
-    expect(EMPTY_QUERY.sort).toBe("localReach");
-    expect(DISCOVER_SORTS[0].value).toBe("localReach");
+  it("defaults to follower count, the way a buyer browses a catalogue", () => {
+    expect(EMPTY_QUERY.sort).toBe("followers");
+    expect(DISCOVER_SORTS[0].value).toBe("followers");
   });
 
-  it("still offers followers, but not first", () => {
+  it("keeps the reach-based orders one click away", () => {
     const values = DISCOVER_SORTS.map((s) => s.value);
-    expect(values).toContain("followers");
-    expect(values.indexOf("followers")).toBeGreaterThan(values.indexOf("localReach"));
+    expect(values).toEqual(expect.arrayContaining(["localReach", "reach", "value", "engagement", "rate"]));
   });
 
   it("ranks a hollow channel below a smaller one that delivers", () => {

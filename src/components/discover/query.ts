@@ -15,19 +15,19 @@ import type { CityTier, Creator, CreatorTier, LanguageCode, Niche, Platform, Reg
 export type DiscoverSort = "localReach" | "reach" | "value" | "engagement" | "followers" | "rate";
 
 /**
- * Ordered the way a buyer should think, not the way a media kit is written.
+ * Size first, which is how a buyer browses a catalogue, with the reach-based orders a click away.
  *
- * "Most followers" led this list and was the default, which sorted the catalogue by the one number
- * the rest of the product exists to question — a 2M-subscriber channel delivering 3,510 views came
- * first. Delivered reach inside Maharashtra leads now; followers remain available, at the bottom.
+ * Leading on followers is only safe because the card no longer hides what sits behind them: every
+ * row reads "2.0M followers → 3,510 views", with a chip when few of them turn up. The ordering can
+ * flatter a channel; the row itself cannot.
  */
 export const DISCOVER_SORTS: readonly { value: DiscoverSort; label: string }[] = [
+  { value: "followers", label: "Most followers" },
   { value: "localReach", label: "Most views in Maharashtra" },
   { value: "reach", label: "Most views" },
   { value: "value", label: "Best value per view" },
   { value: "engagement", label: "Highest engagement" },
   { value: "rate", label: "Lowest reel fee" },
-  { value: "followers", label: "Most followers" },
 ];
 
 export interface DiscoverQuery {
@@ -57,7 +57,7 @@ export const EMPTY_QUERY: DiscoverQuery = {
   minEr: 0,
   minAuth: 0,
   verified: false,
-  sort: "localReach",
+  sort: "followers",
 };
 
 function oneOf<T extends string | number>(raw: string | null, allowed: readonly T[]): T | null {
