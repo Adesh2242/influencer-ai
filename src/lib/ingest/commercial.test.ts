@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { commercialStatus } from "./commercial";
-import { classifyNiches } from "./niche";
+import { classifyNiches, substringOnlyNiches } from "./niche";
 
 /**
  * On 24 November the Discover page offered "Bhikkhu Gyanjyoti" — an ordained Buddhist monk with
@@ -83,5 +83,63 @@ describe("other accounts that are not inventory", () => {
 
   it("keeps a creator who merely talks about the news", () => {
     expect(commercialStatus({ name: "Kunal Explains", bio: "I break down the week's headlines for Maharashtra." }).bookable).toBe(true);
+  });
+});
+
+/**
+ * Twelve news channels were still being served after the first fix, because a handle has no spaces:
+ * whole-word matching cannot see "news" inside "news18marathi". All of these are real handles taken
+ * from the live catalogue.
+ */
+describe("news channels whose handle has no word boundaries", () => {
+  const realHandles: [string, string][] = [
+    ["News18 Marathi", "news18marathi"],
+    ["ucnnewslive", "ucnnewslive"],
+    ["channel B", "channelbnews"],
+    ["Pune Live पुणे लाईव्ह", "punelivenews2019"],
+    ["rrcnewsakola", "rrcnews_akola"],
+    ["News11 Maharashtra", "news11maharashtra54"],
+    ["Raigad Times Digital ", "raigadtimesnews"],
+    ["My Marathi", "mymarathinews"],
+    ["नव महाराष्ट्र NETWORK", "navmaharashtranewsnetwork"],
+  ];
+
+  for (const [name, handle] of realHandles) {
+    it(`excludes ${name}`, () => {
+      expect(commercialStatus({ name, handle }).kind).toBe("news");
+    });
+  }
+
+  it("still excludes the short broadcaster tokens as whole words", () => {
+    expect(commercialStatus({ name: "Zee 24 Taas", handle: "@zee24taas" }).kind).toBe("news");
+    expect(commercialStatus({ name: "ABP Majha", handle: "@abpmajha" }).kind).toBe("news");
+  });
+
+  it("does not catch a person whose name merely contains one of them", () => {
+    // "zee" inside "Zeeshan", "saam" inside "Saamna" — the reason those are not substring-matched.
+    expect(commercialStatus({ name: "Zeeshan Khan Vlogs", handle: "@zeeshankhan" }).kind).toBe("creator");
+    expect(commercialStatus({ name: "Saamna Comedy", handle: "@saamnacomedy" }).kind).toBe("creator");
+  });
+
+  it("excludes a police-recruitment coaching account", () => {
+    expect(commercialStatus({ name: "YJ Academy - Police Bharti ", handle: "@yjacademy" }).kind).toBe("institution");
+  });
+});
+
+describe("repairing niche tags already stored", () => {
+  it("strips automotive from a Marathi cooking channel that only ever said नमस्कार", () => {
+    // Sarita's Kitchen, live in the catalogue: bio "नमस्कार मित्र आणि मैत्रिणींनो", tagged automotive.
+    // नमस्कार ends in कार — "car" — which is the whole of the evidence.
+    const text = "नमस्कार मित्र आणि मैत्रिणींनो saritas kitchen marathi diwali faral recipes besan ladoo recipe";
+    expect(substringOnlyNiches(text, ["food", "lifestyle", "automotive"])).toEqual(["automotive"]);
+  });
+
+  it("keeps a tag that has real whole-word evidence", () => {
+    const text = "Bike reviews and car first drives across Maharashtra. नमस्कार!";
+    expect(substringOnlyNiches(text, ["automotive"])).toEqual([]);
+  });
+
+  it("keeps a tag with no keyword evidence either way, since it came from a YouTube topic", () => {
+    expect(substringOnlyNiches("just some words", ["automotive", "food"])).toEqual([]);
   });
 });

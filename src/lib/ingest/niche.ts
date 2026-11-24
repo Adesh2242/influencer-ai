@@ -58,6 +58,23 @@ const NICHE_KEYWORDS: Record<Niche, string[]> = {
 };
 
 
+/**
+ * Of `niches`, the ones whose only evidence in `text` is a substring inside a longer word — never
+ * a whole word. These are exactly the tags the old substring matcher invented, so this is what a
+ * repair pass can strip from a stored record without re-fetching anything: it answers "would this
+ * tag have existed if the matcher had been right?" and nothing else. Tags with real whole-word
+ * evidence, and tags that came from a YouTube topic rather than a keyword, are left alone.
+ */
+export function substringOnlyNiches(text: string, niches: readonly Niche[]): Niche[] {
+  const haystack = text.toLowerCase();
+  return niches.filter((niche) => {
+    const words = (NICHE_KEYWORDS[niche] ?? []).map((word) => word.toLowerCase());
+    const asSubstring = words.some((word) => haystack.includes(word));
+    const asWord = words.some((word) => containsWord(haystack, word));
+    return asSubstring && !asWord;
+  });
+}
+
 function topicIdFromUrl(url: string): string {
   return url.split("/wiki/")[1] ?? "";
 }
@@ -74,8 +91,10 @@ export function classifyNiches(input: { text: string; topicCategories: string[] 
 
   for (const [niche, words] of Object.entries(NICHE_KEYWORDS) as [Niche, string[]][]) {
     for (const word of words) {
-      // Whole words only. Substring matching let "auto" fire inside unrelated words and "car"
-      // inside "scar" or "carnival", which is how an ascetic monk acquired an Auto & EVs tag.
+      // Whole words only. Substring matching put 136 creators under "Auto & EVs" who have nothing
+      // to do with vehicles: the Marathi for "hello", नमस्कार, ends in कार — "car" — so almost
+      // every Marathi creator who greets their audience in their channel description was tagged
+      // automotive. "auto" fires inside unrelated words the same way.
       if (containsWord(text, word.toLowerCase())) add(niche, 2);
     }
   }

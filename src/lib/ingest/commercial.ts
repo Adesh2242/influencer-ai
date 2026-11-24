@@ -73,40 +73,49 @@ const HONORIFIC_TITLES = [
  */
 const ORDAINED_CONTEXT = ["monastery", "vihar", "math ", "ashram", "sangha", "ordained", "मठ", "विहार", "आश्रम", "संघ"];
 
-/** Broadcasters and news desks. They sell advertising; they do not take influencer briefs. */
-const NEWS_TERMS = [
+/**
+ * Broadcasters and news desks. They sell advertising; they do not take influencer briefs.
+ *
+ * Split by how safely each term can be matched inside a longer string. A handle has no spaces, so
+ * whole-word matching cannot see "news" in "news18marathi" or "mymarathinews" — twelve news
+ * channels were still being served for exactly that reason. These terms are distinctive enough
+ * that a substring hit is almost always the real thing.
+ */
+const NEWS_SUBSTRINGS = [
   "news",
   "tv9",
-  "abp",
-  "zee",
-  "lokmat",
-  "saam",
   "tv18",
+  "lokmat",
   "aaj tak",
   "samachar",
   "patrika",
-  "times now",
   "bulletin",
   "बातम्या",
   "वृत्त",
   "समाचार",
 ];
 
-/** Public bodies and official handles. */
-const INSTITUTION_TERMS = [
+/** Short news tokens that collide with ordinary names: "zee" inside "Zeeshan", "saam" in "Saamna". */
+const NEWS_WORDS = ["zee", "abp", "saam", "times now", "zee24"];
+
+/** Public bodies and official handles. Long and distinctive, so matched as substrings too. */
+const INSTITUTION_SUBSTRINGS = [
   "municipal",
-  "corporation",
+  "nagarparishad",
   "nagar parishad",
+  "zillaparishad",
   "zilla parishad",
-  "government",
-  "govt",
-  "ministry",
-  "police",
-  "collector",
+  "mahanagarpalika",
   "महानगरपालिका",
   "नगरपरिषद",
-  "शासन",
 ];
+
+/** Institution words that are ordinary English otherwise ("corporation", "collector"). */
+const INSTITUTION_WORDS = ["corporation", "government", "govt", "ministry", "police", "collector", "शासन"];
+
+function findSubstring(haystack: string, terms: readonly string[]): string | undefined {
+  return terms.find((term) => haystack.includes(term));
+}
 
 function findWord(haystack: string, terms: readonly string[]): string | undefined {
   return terms.find((term) => containsWord(haystack, term));
@@ -143,7 +152,7 @@ export function commercialStatus(input: { name: string; handle?: string; bio?: s
     };
   }
 
-  const news = findWord(title, NEWS_TERMS);
+  const news = findSubstring(title, NEWS_SUBSTRINGS) ?? findWord(title, NEWS_WORDS);
   if (news) {
     return {
       kind: "news",
@@ -153,7 +162,7 @@ export function commercialStatus(input: { name: string; handle?: string; bio?: s
     };
   }
 
-  const institution = findWord(title, INSTITUTION_TERMS);
+  const institution = findSubstring(title, INSTITUTION_SUBSTRINGS) ?? findWord(title, INSTITUTION_WORDS);
   if (institution) {
     return {
       kind: "institution",

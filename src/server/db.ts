@@ -7,9 +7,11 @@
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
 import { commercialStatus, statusOf } from "../lib/ingest/commercial";
+import { substringOnlyNiches } from "../lib/ingest/niche";
 import { wellFormedDeep } from "../lib/text";
 import { MIN_FOLLOWERS, MIN_SAMPLE_FOR_PRICING } from "../lib/ingest/pipeline";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
+import type { Niche } from "../types";
 
 let pool: Pool | undefined;
 
@@ -112,6 +114,7 @@ export async function migrate(client?: PoolClient): Promise<void> {
   const runner = client ?? getPool();
   await runner.query(SCHEMA);
   await reconcileBookable(runner);
+  await reconcileNiches(runner);
 }
 
 /**
@@ -129,6 +132,44 @@ async function reconcileBookable(runner: { query: Pool["query"] }): Promise<void
   if (unbookable.length === 0) return;
   await runner.query("update creators set bookable = false where id = any($1)", [unbookable.map((row) => row.id)]);
   console.log(`[db] marked ${unbookable.length} stored account(s) as not bookable: ${unbookable.slice(0, 5).map((r) => r.name).join(", ")}`);
+}
+
+/**
+ * Strips niche tags that only ever existed because the old classifier matched substrings. 136
+ * stored creators were filed under "Auto & EVs" with nothing to do with vehicles: the Marathi for
+ * "hello", नमस्कार, ends in कार -- "car" -- so a cooking channel that opens its description by
+ * greeting its audience came out automotive, and an electric-scooter brief would surface it.
+ *
+ * Only stored text is used, so this costs no API quota, and it only ever removes a tag whose
+ * keyword evidence is a substring inside a longer word. A tag with real whole-word evidence, or
+ * one that came from a YouTube topic, is left alone, and a record is never left with no niches at
+ * all -- those are the ones to re-ingest rather than guess at.
+ */
+async function reconcileNiches(runner: { query: Pool["query"] }): Promise<void> {
+  const { rows } = await runner.query<{ id: string; niches: string[]; record: SourcedCreator }>(
+    "select id, niches, record from creators",
+  );
+
+  let repaired = 0;
+  for (const row of rows) {
+    const stored = (row.niches ?? []) as Niche[];
+    if (stored.length === 0) continue;
+    const text = [row.record.creator.bio, ...(row.record.content?.tags ?? []), ...(row.record.content?.hashtags ?? [])].join(" ");
+    const bogus = new Set(substringOnlyNiches(text, stored));
+    if (bogus.size === 0) continue;
+
+    const kept = stored.filter((niche) => !bogus.has(niche));
+    if (kept.length === 0) continue; // nothing left to stand on; leave it for a re-ingest
+    const record: SourcedCreator = { ...row.record, creator: { ...row.record.creator, niches: kept } };
+    await runner.query("update creators set niches = $2, record = $3 where id = $1", [
+      row.id,
+      kept,
+      JSON.stringify(wellFormedDeep(record)),
+    ]);
+    repaired++;
+  }
+
+  if (repaired > 0) console.log(`[db] repaired niche tags on ${repaired} stored creator(s)`);
 }
 
 const UPSERT = `insert into creators (

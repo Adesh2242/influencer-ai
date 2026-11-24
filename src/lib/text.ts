@@ -39,7 +39,13 @@ export function wellFormedDeep<T>(value: T): T {
   return value;
 }
 
-const BOUNDARY = "[^\\p{L}\\p{N}]";
+/**
+ * What counts as the edge of a word. Marks (\p{M}) are inside a word, not between words: Devanagari
+ * joins consonants with a virama, which is a combining mark, so a class of just letters and digits
+ * splits नमस्कार into "नमस्" and "कार" and then matches "कार" -- "car" -- as a whole word. That is
+ * the exact bug this helper was added to fix, surviving inside the fix.
+ */
+const BOUNDARY = "[^\\p{L}\\p{N}\\p{M}]";
 
 // These run inside the matching loop, over the whole catalogue, so the compiled form is kept.
 // Building a RegExp per word per creator per match was enough on its own to blow the engine's
