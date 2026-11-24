@@ -7,10 +7,21 @@
 // a Maharashtra brand should care about — cost per relevant view — it is an order of magnitude
 // worse. Everything here exists to make that comparison visible.
 //
-// Measured on the first 60 ingested creators: those publishing in Marathi had a median 33,985
-// views against 2,228 for the rest, at comparable subscriber counts. Marathi content is not only
-// an audience filter, it is a quality signal — the inflated-subscriber channels were overwhelmingly
-// in the non-Marathi group.
+// An earlier version of this comment claimed Marathi creators pulled a median 33,985 views against
+// 2,228 for the rest — a 15x advantage. That was measured on the first 60 channels ingested and it
+// does not survive the full catalogue. Across 452 creators, split by follower band so the
+// comparison actually controls for size:
+//
+//     10-50K     Marathi  1,573   other  1,648   0.95x
+//     50-250K    Marathi  8,818   other  2,893   3.05x
+//     250K-1M    Marathi 20,538   other 13,805   1.49x
+//     1M+        Marathi 15,037   other 47,014   0.32x
+//
+// So the advantage is real but it is not general: it concentrates in the 50K-250K band, fades
+// above that, and reverses outright at a million subscribers, where the big accounts are Hindi or
+// pan-India and pull far more views than Marathi channels of the same size. For a Maharashtra
+// brand that makes mid-tier Marathi creators the efficient buy and million-plus Marathi channels
+// the questionable one — the opposite of what a follower-count shortlist would pick.
 import { DISTRICT_REGION, MH_PLACES } from "../data/maharashtra";
 import type { Creator, CreatorTier, Region } from "../types";
 
