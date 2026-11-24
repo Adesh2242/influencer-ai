@@ -543,6 +543,25 @@ function exclusionReason(creator: Creator, context: BriefContext, choice: Return
   }
   const competitor = competitorWork(creator, context, 6);
   if (competitor) return `Worked with ${competitor.brand} ${monthsAgo(competitor.monthsAgo)} (competitor)`;
+
+  // Language is not a preference. A Tamil campaign cannot run Marathi content: the creative is
+  // unusable, however well the creator scores on everything else. Until this was a hard filter, a
+  // Marathi DJ channel ranked for a Tamil and Telugu skincare brief.
+  if (context.languages.length > 0 && !creator.languages.some((code) => context.languages.includes(code))) {
+    return `Publishes in ${joinWith(creator.languages.map((code) => LANGUAGES[code].label), "and")}; you asked for ${joinWith(
+      context.languages.map((code) => LANGUAGES[code].label),
+      "or",
+    )}`;
+  }
+
+  // Nor is budget. A creator who costs more than the entire campaign cannot be booked at any
+  // trade-off, so they do not belong in a ranked list — a ₹17.5 lakh quote was being shown against
+  // a ₹3 lakh budget, and a ₹83 lakh one above it.
+  const cost = choice.estimate.cost;
+  if (brief.budgetINR > 0 && cost > brief.budgetINR) {
+    return `${formatINRCompact(cost)} for one ${DELIVERABLE_NOUN[brief.deliverable].one.toLowerCase()} is more than your entire ${formatINRCompact(brief.budgetINR)} budget`;
+  }
+
   return null;
 }
 

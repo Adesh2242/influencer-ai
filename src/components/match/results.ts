@@ -64,7 +64,16 @@ export function summarizeMatches(
   };
 }
 
-export type ExclusionKind = "platform" | "deliverable" | "tier" | "authenticity" | "engagement" | "competitor" | "other";
+export type ExclusionKind =
+  | "platform"
+  | "deliverable"
+  | "tier"
+  | "authenticity"
+  | "engagement"
+  | "competitor"
+  | "language"
+  | "budget"
+  | "other";
 
 // Mirrors the sentences produced by exclusionReason() in lib/matching/engine.ts.
 const EXCLUSION_PATTERNS: [ExclusionKind, RegExp][] = [
@@ -74,6 +83,8 @@ const EXCLUSION_PATTERNS: [ExclusionKind, RegExp][] = [
   ["authenticity", /^Authenticity score /],
   ["engagement", / engagement on .+ is below your /],
   ["competitor", /\(competitor\)$/],
+  ["language", /^Publishes in /],
+  ["budget", /is more than your entire /],
 ];
 
 export function exclusionKind(reason: string): ExclusionKind {
@@ -102,6 +113,20 @@ function relaxFor(kind: ExclusionKind, brief: CampaignBrief): Omit<ExclusionGrou
       };
     case "tier":
       return { suggestion: "They fall outside the creator sizes you selected.", relax: { creatorTiers: [] }, relaxLabel: "Allow every creator size" };
+    case "language":
+      return {
+        suggestion: "They publish in a language your brief does not ask for.",
+        relax: { languages: [] },
+        relaxLabel: "Accept any language",
+      };
+    case "budget":
+      return {
+        // Deliberately offers no automatic relax: raising a client's budget is not a filter to
+        // loosen, it is a conversation to have. The honest move is fewer creators or smaller ones.
+        suggestion: "One booking would cost more than the whole campaign budget.",
+        relax: null,
+        relaxLabel: "",
+      };
     case "authenticity": {
       const lower = Math.max(0, Math.min(brief.minAuthenticity - 20, 50));
       return {

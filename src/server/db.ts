@@ -7,7 +7,7 @@
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
 import { wellFormedDeep } from "../lib/text";
-import { MIN_FOLLOWERS } from "../lib/ingest/pipeline";
+import { MIN_FOLLOWERS, MIN_SAMPLE_FOR_PRICING } from "../lib/ingest/pipeline";
 import type { SourcedCreator } from "../lib/ingest/pipeline";
 
 let pool: Pool | undefined;
@@ -223,7 +223,14 @@ const CONFIDENCE_SETS: Record<string, string[]> = {
 export async function listCreators(query: CreatorQuery = {}): Promise<SourcedCreator[]> {
   const allowed = CONFIDENCE_SETS[query.minConfidence ?? "likely"];
   const params: unknown[] = [allowed, query.minFollowers ?? MIN_FOLLOWERS];
-  let sql = "select record from creators where location_confidence = any($1) and followers >= $2";
+  // Records collected before the dormancy and sample-size gates existed are still stored. Serving
+  // them means a channel with two videos from 2021 keeps appearing with an ₹83 lakh quote, because
+  // it will never be re-ingested — the gates that would re-price it now reject it outright. The
+  // coalesce keeps any record whose shape predates the field rather than dropping it blindly.
+  let sql = `select record from creators
+     where location_confidence = any($1)
+       and followers >= $2
+       and coalesce((record->'metrics'->>'sampleSize')::int, ${MIN_SAMPLE_FOR_PRICING}) >= ${MIN_SAMPLE_FOR_PRICING}`;
   if (query.cityId) {
     params.push(query.cityId);
     sql += ` and city_id = $${params.length}`;
@@ -280,7 +287,12 @@ export async function getCreator(id: string): Promise<SourcedCreator | undefined
 
 export async function countCreators(): Promise<{ total: number; served: number }> {
   const { rows } = await getPool().query<{ total: string; served: string }>(
-    "select count(*)::text as total, count(*) filter (where followers >= $1)::text as served from creators",
+    `select count(*)::text as total,
+            count(*) filter (
+              where followers >= $1
+                and coalesce((record->'metrics'->>'sampleSize')::int, ${MIN_SAMPLE_FOR_PRICING}) >= ${MIN_SAMPLE_FOR_PRICING}
+            )::text as served
+       from creators`,
     [MIN_FOLLOWERS],
   );
   return { total: Number(rows[0]?.total ?? 0), served: Number(rows[0]?.served ?? 0) };

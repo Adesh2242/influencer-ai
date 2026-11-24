@@ -113,7 +113,7 @@ export function ResultsPanel() {
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Eligible</dt>
             <dd className="text-xl font-bold tabular-nums text-slate-900">{summary.eligible}</dd>
-            <dd className="text-xs text-slate-500">of {creators.length} demo creators</dd>
+            <dd className="text-xs text-slate-500">of {creators.length} creators</dd>
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Excluded</dt>

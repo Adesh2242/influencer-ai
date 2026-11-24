@@ -193,3 +193,55 @@ describe("matchCreators", () => {
     expect(Math.min(...timings)).toBeLessThan(15);
   });
 });
+
+/**
+ * From a live screenshot: a ₹3,00,000 brief for 8 Tamil and Telugu beauty creators returned a
+ * Marathi DJ channel at ₹83 lakh a reel and a Hindi entertainment channel at ₹17.5 lakh, ranked
+ * and scored. Budget and language were weighted components rather than constraints, so a creator
+ * nobody could book and whose language nobody could use still earned a place in the list.
+ */
+describe("constraints a buyer cannot trade away", () => {
+  const southBrief: CampaignBrief = mergeBrief(DEFAULT_BRIEF, {
+    niches: ["beauty"],
+    languages: ["ta", "te"],
+    budgetINR: 3_00_000,
+    creatorsWanted: 8,
+    platforms: [],
+    minAuthenticity: 0,
+  });
+
+  it("excludes a creator who costs more than the entire campaign", () => {
+    const dear = creators.find((c) => c.rates.reel > 3_00_000 && c.languages.includes("ta"));
+    if (!dear) return;
+    const result = scoreCreator(southBrief, dear);
+    expect(result.excludedReason).toMatch(/more than your entire/);
+  });
+
+  it("excludes a creator who publishes in none of the briefed languages", () => {
+    const marathi = creators.find((c) => !c.languages.some((l) => ["ta", "te"].includes(l)));
+    expect(marathi).toBeDefined();
+    const result = scoreCreator(southBrief, marathi!);
+    expect(result.excludedReason).toMatch(/^Publishes in /);
+  });
+
+  it("keeps language open when the brief does not name one", () => {
+    const anyLanguage = mergeBrief(southBrief, { languages: [] });
+    const marathi = creators.find((c) => !c.languages.some((l) => ["ta", "te"].includes(l)))!;
+    // null means not excluded at all, which is the point.
+    expect(scoreCreator(anyLanguage, marathi).excludedReason ?? "").not.toMatch(/^Publishes in /);
+  });
+
+  it("keeps budget open when the brief does not set one", () => {
+    const noBudget = mergeBrief(southBrief, { budgetINR: 0, languages: [] });
+    for (const creator of creators.slice(0, 40)) {
+      expect(scoreCreator(noBudget, creator).excludedReason ?? "").not.toMatch(/more than your entire/);
+    }
+  });
+
+  it("leaves nothing eligible for a brief this catalogue cannot serve", () => {
+    const { results, excluded } = matchCreators(southBrief, creators.filter((c) => !c.languages.includes("ta") && !c.languages.includes("te")));
+    expect(results).toHaveLength(0);
+    expect(excluded.length).toBeGreaterThan(0);
+    expect(excluded.every((r) => r.excludedReason !== null)).toBe(true);
+  });
+});
