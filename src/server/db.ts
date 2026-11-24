@@ -381,3 +381,38 @@ export async function recordIngestRun(
     [startedAt, creatorsSeen, quotaSpent, JSON.stringify(report)],
   );
 }
+
+/** Every stored channel's id and the text its niches can be judged against. */
+export async function listStoredForRetopic(): Promise<
+  { id: string; externalId: string; niches: Niche[]; record: SourcedCreator; hasTopics: boolean }[]
+> {
+  const { rows } = await getPool().query<{ id: string; external_id: string; niches: string[]; record: SourcedCreator }>(
+    "select id, external_id, niches, record from creators",
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    externalId: row.external_id,
+    niches: (row.niches ?? []) as Niche[],
+    record: row.record,
+    hasTopics: Array.isArray(row.record.content?.topicCategories),
+  }));
+}
+
+/** Writes recomputed niches and the channel's real YouTube topics back onto a stored record. */
+export async function applyRetopic(
+  id: string,
+  niches: Niche[],
+  topicCategories: string[],
+  record: SourcedCreator,
+): Promise<void> {
+  const updated: SourcedCreator = {
+    ...record,
+    creator: { ...record.creator, niches },
+    content: { ...record.content, topicCategories },
+  };
+  await getPool().query("update creators set niches = $2, record = $3 where id = $1", [
+    id,
+    niches,
+    JSON.stringify(wellFormedDeep(updated)),
+  ]);
+}

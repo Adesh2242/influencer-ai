@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-server/server.mjs",
     "start": "node dist-server/server.mjs",
-    "build:ingest": "esbuild scripts/ingest-maharashtra.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-server/ingest.mjs"
+    "build:ingest": "esbuild scripts/ingest-maharashtra.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-server/ingest.mjs",
+    "retopic": "vite-node scripts/retopic.ts"
   },
   "devDependencies": {
     "@netlify/functions": "^6.0.3",

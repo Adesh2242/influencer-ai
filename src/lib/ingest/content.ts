@@ -49,6 +49,13 @@ export interface ContentProfile {
   sponsoredCount: number;
   /** Videos the profile was built from. */
   sampleSize: number;
+  /**
+   * The channel's own YouTube topicDetails URLs, stored verbatim. Without these there is no way to
+   * tell later whether a stored niche came from the creator's words or from YouTube's own
+   * classification, and that ambiguity is what made the "Auto & EVs" tags unrepairable: a cooking
+   * channel carrying `automotive` could not be distinguished from a genuine one.
+   */
+  topicCategories?: string[];
 }
 
 function rank(counts: Map<string, number>, limit: number): string[] {
@@ -67,7 +74,7 @@ export function extractHashtags(text: string): string[] {
   return found;
 }
 
-export function buildContentProfile(videos: YouTubeVideo[], limit = 15): ContentProfile {
+export function buildContentProfile(videos: YouTubeVideo[], limit = 15, topicCategories: string[] = []): ContentProfile {
   const hashtags = new Map<string, number>();
   const tags = new Map<string, number>();
   let sponsoredCount = 0;
@@ -93,6 +100,7 @@ export function buildContentProfile(videos: YouTubeVideo[], limit = 15): Content
     sponsoredRatio: videos.length > 0 ? Number((sponsoredCount / videos.length).toFixed(3)) : 0,
     sponsoredCount,
     sampleSize: videos.length,
+    topicCategories,
   };
 }
 

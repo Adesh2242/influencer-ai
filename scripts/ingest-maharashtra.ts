@@ -16,6 +16,7 @@ import { closePool, migrate, recordIngestRun, upsertCreators } from "../src/serv
 import { ingestMaharashtra, MIN_FOLLOWERS } from "../src/lib/ingest/pipeline";
 import { MissingKeyError, QuotaExceededError, QuotaMeter } from "../src/lib/ingest/youtube";
 import type { LocationConfidence } from "../src/lib/ingest/location";
+import { retopic } from "./retopic";
 
 function arg(name: string, fallback?: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
@@ -33,6 +34,23 @@ async function main(): Promise<void> {
   const minConfidence = arg("confidence", "likely") as LocationConfidence;
   const quotaLimit = Number(arg("quota", "9000"));
   const startedAt = new Date().toISOString();
+
+  // Records stored before the channel's YouTube topics were kept cannot have their niches judged:
+  // see scripts/retopic.ts. Repairing them costs one quota unit per 50 channels, runs once because
+  // the topics are stored afterwards, and happens before the ingest so a spent quota cannot
+  // postpone it indefinitely.
+  if (process.env.DATABASE_URL && !out && !process.argv.includes("--no-retopic")) {
+    try {
+      const repair = await retopic({ onlyMissing: true });
+      if (repair.examined > 0) {
+        console.log(
+          `Repaired niches from real YouTube topics: ${repair.examined} re-read, ${repair.changed} reclassified, ${repair.unitsSpent} quota unit(s)\n`,
+        );
+      }
+    } catch (error) {
+      console.warn(`Niche repair skipped: ${String(error).slice(0, 160)}\n`);
+    }
+  }
 
   const target = out ? out : process.env.DATABASE_URL ? "Postgres" : "(nowhere — set DATABASE_URL or pass --out)";
   console.log(`Ingesting Maharashtra creators (max ${maxCreators}, quota ${quotaLimit}) into ${target}…`);

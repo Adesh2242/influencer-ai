@@ -193,7 +193,7 @@ export function toCreator(
   metrics: ChannelMetrics,
   verdict: LocationVerdict,
   commentToLikeRatio: number | null,
-  content: ContentProfile = { hashtags: [], tags: [], sponsoredRatio: 0, sponsoredCount: 0, sampleSize: 0 },
+  content: ContentProfile = { hashtags: [], tags: [], sponsoredRatio: 0, sponsoredCount: 0, sampleSize: 0, topicCategories: [] },
 ): SourcedCreator {
   const rng = new Rng(seedFrom(channel.id));
   const handle = (channel.customUrl ?? channel.id).replace(/^@/, "");
@@ -426,7 +426,7 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
       .filter((v) => (v.likeCount ?? 0) > 0)
       .map((v) => (v.commentCount ?? 0) / (v.likeCount as number));
     creators.push(
-      toCreator(channel, metrics, verdict, ratios.length > 0 ? median(ratios) : null, buildContentProfile(videos)),
+      toCreator(channel, metrics, verdict, ratios.length > 0 ? median(ratios) : null, buildContentProfile(videos, 15, channel.topicCategories)),
     );
   }
 

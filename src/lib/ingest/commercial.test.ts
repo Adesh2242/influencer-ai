@@ -143,3 +143,28 @@ describe("repairing niche tags already stored", () => {
     expect(substringOnlyNiches("just some words", ["automotive", "food"])).toEqual([]);
   });
 });
+
+describe("niches are judged against real YouTube topics, not guessed", () => {
+  it("classifies a cooking channel as food even though its bio says नमस्कार", () => {
+    // Sarita's Kitchen, with the topicDetails YouTube actually returns for a cooking channel.
+    const niches = classifyNiches({
+      text: "नमस्कार मित्र आणि मैत्रिणींनो diwali faral recipes besan ladoo recipe saritas kitchen marathi",
+      topicCategories: ["https://en.wikipedia.org/wiki/Food", "https://en.wikipedia.org/wiki/Lifestyle_(sociology)"],
+    });
+    expect(niches).toContain("food");
+    expect(niches).not.toContain("automotive");
+  });
+
+  it("still classifies a genuine motovlogger as automotive", () => {
+    // Z900 Rider, live in the catalogue: the tag was right for him all along.
+    const niches = classifyNiches({
+      text: "hey guys i am a bike rider from mumbai, india. i ride superbikes",
+      topicCategories: ["https://en.wikipedia.org/wiki/Vehicle"],
+    });
+    expect(niches).toContain("automotive");
+  });
+
+  it("gives a channel no niche rather than a wrong one when nothing matches", () => {
+    expect(classifyNiches({ text: "नमस्कार मंडळी", topicCategories: [] })).toEqual([]);
+  });
+});
