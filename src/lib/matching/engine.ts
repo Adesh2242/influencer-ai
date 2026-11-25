@@ -549,8 +549,9 @@ function exclusionReason(creator: Creator, context: BriefContext, choice: Return
   const commercial = statusOf(creator);
   if (!commercial.bookable) return commercial.reason ?? "Not a bookable creator account";
 
-  // No price both sides would sign. Ranking these produces a plan that costs out beautifully and
-  // then collapses on first contact, which is worse than a shorter shortlist.
+  // Nothing to price: the subscriber count and the views contradict each other, so any fee is
+  // invented. A merely expensive creator is NOT excluded — that is a negotiation, and the warning
+  // on the result says so.
   const rate = estimateRate(creator, brief.deliverable);
   if (!rate.viable && rate.blocker) return rate.blocker;
 
@@ -616,6 +617,8 @@ function warningsFor(creator: Creator, context: BriefContext, estimate: Estimate
       `${formatINRCompact(estimate.cost)} per ${DELIVERABLE_NOUN[context.brief.deliverable].one} is ${(estimate.cost / context.perCreatorBudget).toFixed(1)}x your ${formatINRCompact(context.perCreatorBudget)} per-creator budget`,
     );
   }
+  const priced = estimateRate(creator, context.brief.deliverable);
+  if (priced.caution) warnings.push(priced.caution);
   if (creator.responseRate < 0.5) warnings.push(`Replies to about ${percent(creator.responseRate)} of brand enquiries`);
   if (creator.avgTurnaroundDays > 10) warnings.push(`Usually needs about ${creator.avgTurnaroundDays} days to deliver`);
   if (creator.platforms[0] && estimate.stats !== creator.platforms[0]) {

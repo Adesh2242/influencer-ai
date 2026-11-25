@@ -89,12 +89,15 @@ describe("ask versus worth", () => {
     expect(rate.gap).toBeGreaterThan(10);
   });
 
-  it("will not budget a big creator at a tiny creator's fee", () => {
+  it("warns loudly when a big creator's ask will far outrun their reach", () => {
     // A real motovlogger: 9,59,000 subscribers, 9,148 median views, previously quoted ₹1,500.
+    // The fee is still shown: it is the number to walk into that negotiation holding. Hiding it
+    // left half the catalogue reading "n/a", which looks broken rather than careful.
     const thin = creator({ tier: "macro", followers: 959_000, avgViews: 9_148, engagementRate: 1.2 });
     const rate = estimateRate(thin, "reel");
-    expect(rate.viable).toBe(false);
-    expect(rate.blocker).toMatch(/Nobody negotiates down/);
+    expect(rate.viable).toBe(true);
+    expect(rate.fairValue).toBeGreaterThan(0);
+    expect(rate.caution).toMatch(/Likely to open near/);
   });
 
   it("leaves a genuine small creator bookable at a small fee", () => {

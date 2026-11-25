@@ -188,6 +188,13 @@ export interface RateEstimate {
    */
   viable: boolean;
   blocker: string | null;
+  /**
+   * Set when the fee is real but the creator's ask is likely to be far above it. This is a loud
+   * warning, not a blocker: suppressing the number entirely left half the catalogue showing "n/a",
+   * which reads as a broken product rather than a careful one, and the reach-based figure is the
+   * most useful thing a buyer can walk into that negotiation holding.
+   */
+  caution: string | null;
   /** What the creator is likely to quote, from their follower count. */
   likelyAsk: number;
   /** likelyAsk / fairValue. Above 1 means the ask outruns the reach. */
@@ -298,10 +305,13 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
         `${(viewRate * 100).toFixed(2)}% of the audience turns up. Those two figures cannot both be true, so there is nothing here to price.`
       : fairValue < MIN_VIABLE_FEE[deliverable]
         ? `The reach supports about ₹${fairValue.toLocaleString("en-IN")}, below the ₹${MIN_VIABLE_FEE[deliverable].toLocaleString("en-IN")} at which a booking is worth either side's paperwork.`
-        : gap >= UNBRIDGEABLE_GAP
-          ? `Will open near ₹${ask.toLocaleString("en-IN")} off ${followers.toLocaleString("en-IN")} subscribers, but ${views.toLocaleString("en-IN")} median views are worth about ₹${fairValue.toLocaleString("en-IN")}. ` +
-            `Nobody negotiates down ${gap.toFixed(0)}×, so budgeting them at ₹${fairValue.toLocaleString("en-IN")} is fiction.`
-          : null;
+        : null;
+
+  // Priceable, but go in with your eyes open.
+  const caution =
+    blocker === null && gap >= UNBRIDGEABLE_GAP
+      ? `Likely to open near ₹${ask.toLocaleString("en-IN")} off ${followers.toLocaleString("en-IN")} subscribers — about ${gap.toFixed(0)}× what ${views.toLocaleString("en-IN")} median views are worth. Budget the gap or expect a long negotiation.`
+      : null;
 
   const note =
     verdict === "overpriced"
@@ -318,12 +328,13 @@ export function estimateRate(creator: Creator, requested: Deliverable = "reel"):
     fairValue,
     viable: blocker === null,
     blocker,
+    caution,
     likelyAsk: ask,
     gap: Number(gap.toFixed(2)),
     verdict,
     effectiveCPM,
     workings,
-    negotiationNote: blocker ?? note,
+    negotiationNote: blocker ?? caution ?? note,
   };
 }
 

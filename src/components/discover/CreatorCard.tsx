@@ -53,13 +53,19 @@ export function CreatorCard({ creator }: { creator: Creator }) {
               <Metric
                 label="Reel, worth"
                 value={formatINRCompact(creator.rates.reel)}
-                hint={<span className="text-slate-500">₹{formatCount(localCPM)} per 1,000 in-state</span>}
+                hint={
+                  rate.caution ? (
+                    <span className="text-amber-700">they may ask far more</span>
+                  ) : (
+                    <span className="text-slate-500">₹{formatCount(localCPM)} per 1,000 in-state</span>
+                  )
+                }
               />
             ) : (
               <Metric
                 label="Reel, worth"
                 value={<span className="text-slate-400">n/a</span>}
-                hint={<span className="text-amber-700">no fee both sides would sign</span>}
+                hint={<span className="text-amber-700">subscribers and views disagree</span>}
               />
             )}
             <Metric

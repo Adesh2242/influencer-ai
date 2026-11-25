@@ -8,7 +8,10 @@ const ENDPOINT = "/api/parse-brief";
 const TIMEOUT_MS = 25_000;
 const MAX_AI_LENGTH = 4000;
 
-export const AI_FALLBACK_NOTE = "AI parsing isn't available right now, so the built-in parser read your brief.";
+// The rules parser is the product's own parser, not a degraded mode: it reads budgets in lakh and
+// crore, Hinglish, Devanagari, districts and divisions, and it is what every test covers. Calling
+// it a fallback for a missing AI key announced an outage for something that worked correctly.
+export const AI_FALLBACK_NOTE = "Read by the built-in parser. Check the fields below before you shortlist.";
 
 function withNote(parsed: ParsedBrief, note: string): ParsedBrief {
   return { ...parsed, notes: [note, ...parsed.notes] };
