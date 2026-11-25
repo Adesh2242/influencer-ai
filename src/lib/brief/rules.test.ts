@@ -297,3 +297,36 @@ describe("parseBriefWithRules: robustness", () => {
     expect(parse("Gen Z and teens").targetAges).toEqual(["13-17", "18-24"]);
   });
 });
+
+/**
+ * A brief typed live during a demo, which came back as "We couldn't read that brief". The parser
+ * was never the problem — it reads this correctly — the dynamic import of the parser chunk had
+ * failed on a tab older than the last deploy. Keeping the case here so the parser side stays
+ * honest: plain English, no budget, no creator count, no explicit niche word.
+ */
+describe("an ordinary brief with no numbers in it", () => {
+  const TEXT =
+    "looking for a influencer for women's ethnic wear in modern style. Our target is people looking " +
+    "for good quality and unique ethnic wear. A little pricey. We are based out of mumbai and " +
+    "shipping all over INdia. we also customize ethnic outfits for customers.";
+
+  it("reads the category, niche, audience and city", () => {
+    const brief = parse(TEXT);
+    expect(brief.productCategory).toBe("ethnic wear");
+    expect(brief.niches).toEqual(["fashion"]);
+    expect(brief.targetGender).toBe("female");
+    expect(brief.targetCityIds).toEqual(["mumbai"]);
+  });
+
+  it("leaves budget and creator count unset rather than inventing them", () => {
+    const brief = parse(TEXT);
+    expect(brief.budgetINR).toBeFalsy();
+    expect(brief.creatorsWanted).toBeFalsy();
+  });
+
+  it("reports what it found, so the UI never calls this unreadable", () => {
+    const result = parseBriefWithRules(TEXT);
+    expect(result.detectedFields.length).toBeGreaterThan(0);
+    expect(result.detectedFields).toEqual(expect.arrayContaining(["niches", "targetCityIds"]));
+  });
+});

@@ -7,6 +7,7 @@ import { Label, Textarea } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/misc";
 import { SAMPLE_BRIEFS, type SampleBrief } from "@/data/sampleBriefs";
 import { DEFAULT_BRIEF, mergeBrief } from "@/lib/brief/defaults";
+import { importChunk } from "@/lib/chunk";
 import { useBrief } from "@/state/BriefContext";
 import { BriefEditor } from "./BriefEditor";
 
@@ -43,7 +44,9 @@ export function BriefPanel() {
     setError(null);
     try {
       // Loaded on demand: the client pulls in zod, which the rest of the page doesn't need.
-      const { parseBrief } = await import("@/lib/brief/client");
+      // Through importChunk, so a tab open from before a deploy reloads and recovers instead of
+      // reporting that it could not read a brief it never managed to parse.
+      const { parseBrief } = await importChunk(() => import("@/lib/brief/client"));
       const parsed = await parseBrief(text, { signal: controller.signal });
       if (controller.signal.aborted) return;
       // The text is the source of truth: start from a clean brief so nothing from an earlier brief or
