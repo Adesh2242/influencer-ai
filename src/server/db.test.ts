@@ -107,3 +107,24 @@ describe("JSON paths into the stored record", () => {
     }
   });
 });
+
+describe("the static file fallback", () => {
+  const source = readFileSync(new URL("../../server.ts", import.meta.url), "utf8");
+
+  /**
+   * Serving index.html for a missing /assets/*.js returned HTTP 200 with text/html where the
+   * browser expected a JavaScript module. Any tab open from before a deploy then failed to parse
+   * its lazy chunk and rendered a blank white page with nothing in the UI to explain it.
+   */
+  it("404s a missing asset instead of handing back the SPA shell", () => {
+    expect(source).toContain('url.pathname.startsWith("/assets/")');
+    const guard = source.indexOf('res.end("Not found")');
+    const shell = source.indexOf('resolveStatic("/index.html")');
+    expect(guard, "the asset guard must come before the SPA shell fallback").toBeGreaterThan(0);
+    expect(guard).toBeLessThan(shell);
+  });
+
+  it("404s anything else that looks like a file request", () => {
+    expect(source).toMatch(/\\\.\[a-zA-Z0-9\]\{2,5\}\$/);
+  });
+});

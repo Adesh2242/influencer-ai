@@ -291,7 +291,20 @@ export const server = createServer((req, res) => {
         return;
       }
 
-      // Unknown path: hand back the SPA shell so client-side routing can take over. Never cached,
+      // A missing asset is a 404, not the SPA shell. Serving index.html for /assets/old-hash.js
+      // returned HTTP 200 with text/html where the browser expected a JavaScript module, so an
+      // open tab from before a deploy failed to parse its lazy chunk and rendered a blank white
+      // page with nothing in the UI to explain it. Every redeploy did this to every open tab.
+      //
+      // The shell is only for routes the client router can handle, so anything that looks like a
+      // file request gets an honest 404 and the browser reports a failed import instead.
+      if (url.pathname.startsWith("/assets/") || /\.[a-zA-Z0-9]{2,5}$/.test(url.pathname)) {
+        res.writeHead(404, { ...SECURITY_HEADERS, "Content-Type": "text/plain", "Cache-Control": "no-store" });
+        res.end("Not found");
+        return;
+      }
+
+      // Unknown route: hand back the SPA shell so client-side routing can take over. Never cached,
       // so a new deployment's asset URLs are picked up on the next visit.
       const shell = await resolveStatic("/index.html");
       if (!shell) {
