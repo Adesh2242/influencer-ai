@@ -72,14 +72,14 @@ export const SAMPLE_BRIEFS: SampleBrief[] = [
     "food-marathwada",
     "Masala brand · Marathwada kitchens",
     "Suvarna Masale च्या नव्या गोडा मसाल्यासाठी मराठवाड्यातील फूड क्रिएटर्स हवे आहेत. छत्रपती संभाजीनगर, नांदेड, लातूर. " +
-      "6 क्रिएटर्स, मराठी कंटेंट, Instagram Reels. बजेट ₹2.5 लाख. 25-44 वयोगटातील गृहिणी हे मुख्य प्रेक्षक.",
+      "6 क्रिएटर्स, मराठी कंटेंट, YouTube Shorts किंवा Instagram Reels. बजेट ₹2.5 लाख. 25-44 वयोगटातील गृहिणी हे मुख्य प्रेक्षक.",
     {
       brandName: "Suvarna Masale",
       productCategory: "goda masala",
       goal: "awareness",
       niches: ["food"],
       languages: ["mr"],
-      platforms: ["instagram"],
+      platforms: ["youtube", "instagram"],
       deliverable: "reel",
       targetGender: "female",
       targetAges: ["25-34", "35-44"],
@@ -137,14 +137,14 @@ export const SAMPLE_BRIEFS: SampleBrief[] = [
     "Monsoon tourism · Konkan",
     "Konkan Stays is running a monsoon campaign for its homestays in Ratnagiri and Sindhudurg. " +
       "Want 7 travel and lifestyle creators from Mumbai and Pune who will actually travel down, Marathi or English. " +
-      "Instagram Reels, budget ₹6 lakh, audience 25-44 with disposable income.",
+      "YouTube Shorts or Instagram Reels, budget ₹6 lakh, audience 25-44 with disposable income.",
     {
       brandName: "Konkan Stays",
       productCategory: "monsoon travel",
       goal: "awareness",
       niches: ["travel", "lifestyle"],
       languages: ["mr", "en"],
-      platforms: ["instagram"],
+      platforms: ["youtube", "instagram"],
       deliverable: "reel",
       targetAges: ["25-34", "35-44"],
       targetRegions: ["konkan", "mumbai_metro"],
