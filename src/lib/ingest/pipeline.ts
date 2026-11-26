@@ -25,6 +25,7 @@ import { YOUTUBE_PROVENANCE, type ProvenanceMap, type SourceRecord } from "./pro
 import {
   getChannels,
   getRecentVideoIds,
+  getCommentAuthors,
   getVideos,
   QUOTA_COST,
   QuotaMeter,
@@ -163,6 +164,14 @@ export interface IngestOptions {
   maxCreators?: number;
   /** How many searches to run. Each costs 100 quota units. */
   maxQueries?: number;
+  /**
+   * Videos belonging to creators already in the database, used to mine commenter channel ids.
+   * Discovery through search costs 100 units for about 22 candidates; one of these costs 1 unit
+   * for up to 100, so this is where almost all new creators come from once the catalogue exists.
+   */
+  seedVideoIds?: string[];
+  /** Channel ids already stored, so mined candidates that are known cost nothing to look up. */
+  knownChannelIds?: Iterable<string>;
   /** Channels smaller than this are skipped: too little signal to score. */
   minSubscribers?: number;
   /** How sure we must be that the creator is in Maharashtra. */
@@ -174,6 +183,10 @@ export interface IngestOptions {
 }
 
 export interface IngestReport {
+  /** Videos whose comments were mined for new channel ids. */
+  videosMined: number;
+  /** Commenter channel ids seen, before de-duplication against what is already stored. */
+  minedCandidates: number;
   creators: SourcedCreator[];
   queriesRun: number;
   channelsInspected: number;
@@ -285,7 +298,10 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
     recentDays = 180,
     quota = new QuotaMeter(),
     now = Date.now(),
+    seedVideoIds = [],
+    knownChannelIds = [],
   } = options;
+  const known = new Set(knownChannelIds);
 
   const rejections: Record<string, number> = {};
   /** Groups one channel's failure under a stable heading, so the report stays readable. */
@@ -323,6 +339,34 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
       reject(`search failed: ${reasonFor(error)}`);
     }
   }
+
+  // 1b. Mining. Every id here costs a hundredth of a search, so this runs until the budget is
+  // nearly gone rather than to a fixed count. Candidates already in the database are dropped
+  // before the lookup, because re-checking a known channel is the one way to waste this.
+  let videosMined = 0;
+  let minedCandidates = 0;
+  if (!quotaExhausted) {
+    for (const videoId of seedVideoIds) {
+      // Leave room for the enrichment that turns candidates into creators; discovery that cannot
+      // be followed up is quota spent for nothing.
+      if (!quota.canAfford(QUOTA_COST.commentThreads + 200)) break;
+      quota.charge(QUOTA_COST.commentThreads);
+      videosMined++;
+      try {
+        for (const id of await getCommentAuthors(videoId)) {
+          minedCandidates++;
+          if (!known.has(id)) channelIds.add(id);
+        }
+      } catch (error) {
+        if (error instanceof QuotaExceededError) {
+          quotaExhausted = true;
+          break;
+        }
+        reject(`comment mining failed: ${reasonFor(error)}`);
+      }
+    }
+  }
+  for (const id of known) channelIds.delete(id);
 
   // 2. Enrichment, batched 50 at a time.
   // Batched fifty at a time by getChannels; fetch batch by batch here so one refused batch costs
@@ -433,9 +477,52 @@ export async function ingestMaharashtra(options: IngestOptions = {}): Promise<In
   return {
     creators,
     queriesRun,
+    videosMined,
+    minedCandidates,
     channelsInspected: channels.length,
     rejections,
     quotaSpent: quota.spent,
     quotaExhausted: quotaExhausted || quota.remaining < QUOTA_COST.search,
   };
+}
+
+
+/**
+ * Recent video ids for channels already in the database, to mine comments from.
+ *
+ * Costs one unit per fifty channels to find their uploads playlists, then one unit per channel for
+ * the video list. Both are trivial next to a search, and each video then yields up to a hundred
+ * commenter ids for one more unit.
+ */
+export async function seedVideosFromChannels(
+  channelIds: readonly string[],
+  options: { quota: QuotaMeter; perChannel?: number; maxChannels?: number } = { quota: new QuotaMeter() },
+): Promise<string[]> {
+  const { quota, perChannel = 3, maxChannels = 400 } = options;
+  const ids = [...channelIds].slice(0, maxChannels);
+  const videos: string[] = [];
+
+  for (let i = 0; i < ids.length; i += 50) {
+    if (!quota.canAfford(QUOTA_COST.channels)) break;
+    quota.charge(QUOTA_COST.channels);
+    let channels: YouTubeChannel[];
+    try {
+      channels = await getChannels(ids.slice(i, i + 50));
+    } catch (error) {
+      if (error instanceof QuotaExceededError) break;
+      continue; // One refused batch, not the whole seed list.
+    }
+    for (const channel of channels) {
+      if (!channel.uploadsPlaylistId) continue;
+      if (!quota.canAfford(QUOTA_COST.playlistItems)) return videos;
+      quota.charge(QUOTA_COST.playlistItems);
+      try {
+        videos.push(...(await getRecentVideoIds(channel.uploadsPlaylistId, perChannel)).slice(0, perChannel));
+      } catch (error) {
+        if (error instanceof QuotaExceededError) return videos;
+        // A deleted channel or an empty playlist costs this channel only.
+      }
+    }
+  }
+  return videos;
 }
