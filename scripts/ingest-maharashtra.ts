@@ -12,8 +12,8 @@
 // safely after the reset in both halves of the year. A run at 03:00 UTC returned zero creators for
 // exactly this reason.
 import { writeFile } from "node:fs/promises";
-import { closePool, listStoredForRetopic, migrate, recordIngestRun, upsertCreators } from "../src/server/db";
-import { ingestMaharashtra, MIN_FOLLOWERS, seedVideosFromChannels } from "../src/lib/ingest/pipeline";
+import { closePool, migrate, recordIngestRun, upsertCreators } from "../src/server/db";
+import { ingestMaharashtra, MIN_FOLLOWERS } from "../src/lib/ingest/pipeline";
 import { MissingKeyError, QuotaExceededError, QuotaMeter } from "../src/lib/ingest/youtube";
 import type { LocationConfidence } from "../src/lib/ingest/location";
 import { retopic } from "./retopic";
@@ -27,12 +27,7 @@ async function main(): Promise<void> {
   const out = arg("out");
   const maxCreators = Number(arg("max", "800"));
   const minSubscribers = Number(arg("min-subs", String(MIN_FOLLOWERS)));
-  // Searching is 100 units for about 22 candidates, 84% of them under the follower floor; mining
-  // the comments of creators already stored is 1 unit for up to 100. Keep a handful of searches so
-  // the catalogue can still reach subjects nobody in it talks about, and spend the rest on mining.
-  const maxQueries = Number(arg("queries", "12"));
-  const seedChannels = Number(arg("seed-channels", "400"));
-  const perChannel = Number(arg("videos-per-channel", "3"));
+  const maxQueries = Number(arg("queries", "80"));
   // Rotate the seed queries by the day, so a daily job explores new ground each run instead of
   // rediscovering the same channels. --offset overrides it for a manual backfill.
   const seedOffset = Number(arg("offset", String(Math.floor(Date.now() / 86_400_000) * maxQueries)));
@@ -60,36 +55,17 @@ async function main(): Promise<void> {
   const target = out ? out : process.env.DATABASE_URL ? "Postgres" : "(nowhere — set DATABASE_URL or pass --out)";
   console.log(`Ingesting Maharashtra creators (max ${maxCreators}, quota ${quotaLimit}) into ${target}…`);
 
-  // Seeds and the known-id set both come from what is already stored, so each run mines a wider
-  // base than the last and never pays to look up a channel it already has.
-  const quota = new QuotaMeter(quotaLimit);
-  let seedVideoIds: string[] = [];
-  let knownChannelIds: string[] = [];
-  if (process.env.DATABASE_URL && !out) {
-    try {
-      const stored = await listStoredForRetopic();
-      knownChannelIds = stored.map((row) => row.externalId);
-      seedVideoIds = await seedVideosFromChannels(knownChannelIds, { quota, perChannel, maxChannels: seedChannels });
-      console.log(`  seeded ${seedVideoIds.length} videos from ${knownChannelIds.length} stored channels (${quota.spent} units)\n`);
-    } catch (error) {
-      console.warn(`  seeding skipped: ${String(error).slice(0, 140)}\n`);
-    }
-  }
-
   const report = await ingestMaharashtra({
     maxCreators,
     maxQueries,
     minSubscribers,
     minConfidence,
     seedOffset,
-    quota,
-    seedVideoIds,
-    knownChannelIds,
+    quota: new QuotaMeter(quotaLimit),
   });
 
   console.log(`\n  ${report.creators.length} creators found`);
-  console.log(`  ${report.queriesRun} searches, ${report.videosMined} videos mined for commenters`);
-  console.log(`  ${report.minedCandidates} commenter ids seen, ${report.channelsInspected} channels inspected`);
+  console.log(`  ${report.queriesRun} searches, ${report.channelsInspected} channels inspected`);
   console.log(`  quota spent: ${report.quotaSpent}${report.quotaExhausted ? " (exhausted)" : ""}`);
   for (const [reason, count] of Object.entries(report.rejections)) {
     console.log(`    dropped ${count.toString().padStart(4)}  ${reason}`);

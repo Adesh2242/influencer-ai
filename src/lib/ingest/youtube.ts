@@ -9,7 +9,7 @@
 // 50 ids. So discovery is rationed and enrichment is effectively free.
 const API = "https://youtube.googleapis.com/youtube/v3";
 
-export const QUOTA_COST = { search: 100, channels: 1, videos: 1, playlistItems: 1, commentThreads: 1 } as const;
+export const QUOTA_COST = { search: 100, channels: 1, videos: 1, playlistItems: 1 } as const;
 
 export interface YouTubeChannel {
   id: string;
@@ -168,44 +168,6 @@ export async function searchChannels(
     ...(opts.relevanceLanguage ? { relevanceLanguage: opts.relevanceLanguage } : {}),
   });
   return (data.items ?? []).map((item) => item.id?.channelId).filter((id): id is string => Boolean(id));
-}
-
-/**
- * Channel ids of people who commented on a video. One unit for up to 100 of them, against 100
- * units for the ~22 ids a search returns, which is the difference between finding 67 creators a
- * day and finding thousands.
- *
- * The signal is good as well as cheap: someone who comments on a Marathi channel is almost
- * certainly in Maharashtra or the Marathi diaspora, and a useful fraction of them run channels of
- * their own. It is a far better prior than a keyword search, which returns whoever matched the
- * words anywhere in India.
- *
- * Comments are disabled on plenty of videos, which answers 403. That is ordinary, not an error
- * worth stopping for, so it comes back as an empty list.
- */
-export async function getCommentAuthors(videoId: string, max = 100): Promise<string[]> {
-  try {
-    const data = await call<ListResponse<{ snippet?: { topLevelComment?: { snippet?: { authorChannelId?: { value?: string } } } } }>>(
-      "commentThreads",
-      {
-        part: "snippet",
-        videoId,
-        maxResults: String(Math.min(max, 100)),
-        order: "relevance",
-        textFormat: "plainText",
-      },
-    );
-    const ids = new Set<string>();
-    for (const item of data.items ?? []) {
-      const id = item.snippet?.topLevelComment?.snippet?.authorChannelId?.value;
-      if (id) ids.add(id);
-    }
-    return [...ids];
-  } catch (error) {
-    if (error instanceof QuotaExceededError) throw error;
-    // Comments off, video private, or the thread is gone. Nothing to mine, nothing to report.
-    return [];
-  }
 }
 
 interface RawChannel {
