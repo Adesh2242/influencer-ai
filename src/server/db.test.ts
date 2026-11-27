@@ -128,3 +128,14 @@ describe("the static file fallback", () => {
     expect(source).toMatch(/\\\.\[a-zA-Z0-9\]\{2,5\}\$/);
   });
 });
+
+describe("brand safety stored before it was made honest", () => {
+  const source = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
+
+  it("clears any stored score, since nothing here assesses brand safety", () => {
+    expect(source).toContain("reconcileBrandSafety");
+    expect(source).toContain("BRAND_SAFETY_NOT_ASSESSED");
+    // Only rows that still carry a non-zero score are rewritten.
+    expect(source).toMatch(/brandSafety'->>'score'\)::int <> 0/);
+  });
+});

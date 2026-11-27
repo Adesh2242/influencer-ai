@@ -10,7 +10,7 @@
 import { containsWord, startsWithWord } from "../text";
 import type { Creator } from "../../types";
 
-export type AccountKind = "creator" | "religious" | "news" | "institution";
+export type AccountKind = "creator" | "religious" | "news" | "institution" | "business";
 
 export interface CommercialStatus {
   kind: AccountKind;
@@ -98,6 +98,67 @@ const NEWS_SUBSTRINGS = [
 /** Short news tokens that collide with ordinary names: "zee" inside "Zeeshan", "saam" in "Saamna". */
 const NEWS_WORDS = ["zee", "abp", "saam", "times now", "zee24"];
 
+/**
+ * Shops, salons, clinics and other trading businesses. A saree wholesaler and a hair salon were
+ * being priced and ranked as influencers in a jewellery shortlist: they have subscribers, so every
+ * metric computes, but nobody can book them to endorse anything — they are the ones who would buy.
+ *
+ * Split by matching safety, the same way the news terms are. These are long and distinctive, so a
+ * hit anywhere in the name or handle is reliable — which matters because a handle has no spaces
+ * ("ascfashionstore").
+ */
+const BUSINESS_SUBSTRINGS = [
+  "wholesale",
+  "bazaar",
+  "bazar",
+  "showroom",
+  "emporium",
+  "boutique",
+  "parlour",
+  "parlor",
+  "jewellers",
+  "jewelers",
+  "supermarket",
+  "caterers",
+  "furniture",
+  "garments",
+  "fashionstore",
+  "readymade",
+];
+
+/**
+ * Business words that are ordinary English elsewhere, so they need whole-word matching. "llp"
+ * inside "Wallpaper" was a live false positive, which is the same substring trap that put a
+ * cooking channel under "Auto & EVs".
+ *
+ * Deliberately NOT here. "academy" matches 43 creators including working MPSC teachers and dance
+ * channels, and "studio" matches dance studios that are genuine content channels. "hotel" and
+ * "restaurant" are the sharpest lesson: Hotel Shauryawada is a dhaba with 13,00,000 subscribers
+ * and 6,70,000 median views of Marathi food content, and Hotel Namrata turns up more viewers than
+ * it has subscribers. A Maharashtra dhaba running a food channel is a creator, and among the most
+ * authentically local kind. All four would have cost real reach to remove a handful of shops.
+ */
+const BUSINESS_WORDS = [
+  "salon",
+  "spa",
+  "traders",
+  "enterprises",
+  "mart",
+  "store",
+  "clinic",
+  "hospital",
+  "institute",
+  "coaching",
+  "llp",
+  "pvt ltd",
+  "pvt. ltd",
+  "and sons",
+  "& sons",
+  "opticals",
+  "builders",
+  "developers",
+];
+
 /** Public bodies and official handles. Long and distinctive, so matched as substrings too. */
 const INSTITUTION_SUBSTRINGS = [
   "municipal",
@@ -159,6 +220,16 @@ export function commercialStatus(input: { name: string; handle?: string; bio?: s
       bookable: false,
       matched: news,
       reason: "Appears to be a news or broadcast channel. These sell advertising directly; they do not take influencer briefs.",
+    };
+  }
+
+  const business = findSubstring(title, BUSINESS_SUBSTRINGS) ?? findWord(title, BUSINESS_WORDS);
+  if (business) {
+    return {
+      kind: "business",
+      bookable: false,
+      matched: business,
+      reason: "Appears to be a shop or trading business rather than a creator. These are the people who buy influencer campaigns, not the people who run them.",
     };
   }
 

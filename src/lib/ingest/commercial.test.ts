@@ -168,3 +168,62 @@ describe("niches are judged against real YouTube topics, not guessed", () => {
     expect(classifyNiches({ text: "नमस्कार मंडळी", topicCategories: [] })).toEqual([]);
   });
 });
+
+/**
+ * Shops in the creator pool. A saree wholesaler and a hair salon were ranked and priced inside a
+ * jewellery shortlist — every metric computes for them, because they do have subscribers, but they
+ * are the people who buy influencer campaigns rather than the people who run them. All names here
+ * are real entries from the live catalogue.
+ */
+describe("trading businesses are not creators", () => {
+  const shops: [string, string][] = [
+    ["VAHINISAHEB WHOLESALE SAREE", "wholesale"],
+    ["A1 Wholesaler ", "wholesale"],
+    ["JANTA BAZAR - The Complete Family Clothing", "bazar"],
+    ["Vivvaa salon", "salon"],
+    ["Kasturi beauty Parlour and training centre", "parlour"],
+    ["Rajdhani Caterers", "caterers"],
+    ["Firoj furniture", "furniture"],
+    ["sontakke and sons ", "and sons"],
+    ["Dr. Kamthe Piles Clinic", "clinic"],
+    ["Srushti hospital and IVF center ", "hospital"],
+    ["Brothers Technical Institute", "institute"],
+    ["Maharashtra Traders MUMBAI", "traders"],
+  ];
+  for (const [name, term] of shops) {
+    it(`excludes ${name.trim()}`, () => {
+      const status = commercialStatus({ name });
+      expect(status.kind).toBe("business");
+      expect(status.matched).toBe(term);
+    });
+  }
+
+  it("catches a shop whose handle has no word boundaries", () => {
+    expect(commercialStatus({ name: "ascfashionstore", handle: "@ascfashionstore" }).kind).toBe("business");
+  });
+});
+
+describe("what the business filter must not take", () => {
+  /**
+   * Hotel Shauryawada is a dhaba with 13,00,000 subscribers and 6,70,000 median views of Marathi
+   * food content; Hotel Namrata turns up more viewers than it has subscribers. Excluding these on
+   * the word "hotel" would have removed four of the better-performing creators in the catalogue to
+   * be rid of a handful of shops.
+   */
+  it("leaves a dhaba running a Marathi food channel alone", () => {
+    for (const name of ["Hotel Shauryawada", "HOTEL VAHINISAHEB SHIKRAPUR PUNE", "हॉटेल वहिनीसाहेब शिर्डी", "Hotel Namrata Ahilyanagar official"]) {
+      expect(commercialStatus({ name }).bookable, name).toBe(true);
+    }
+  });
+
+  it("does not find 'llp' inside 'Wallpaper'", () => {
+    // A live false positive, and the same substring trap that filed a cooking channel under Auto.
+    expect(commercialStatus({ name: "Nidhi Decor Wallpaper " }).bookable).toBe(true);
+  });
+
+  it("leaves teachers and dance channels alone, which is why 'academy' and 'studio' are absent", () => {
+    for (const name of ["Pradeep Giri Academy", "Rising Star Dance Academy", "D Styler's Dance Studio", "Jimmy Studio"]) {
+      expect(commercialStatus({ name }).bookable, name).toBe(true);
+    }
+  });
+});

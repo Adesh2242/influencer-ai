@@ -7,6 +7,7 @@
 import { Pool, type PoolClient } from "pg";
 import type { Snapshot } from "../lib/analytics";
 import { commercialStatus, statusOf } from "../lib/ingest/commercial";
+import { BRAND_SAFETY_NOT_ASSESSED } from "../lib/ingest/estimate";
 import { substringOnlyNiches } from "../lib/ingest/niche";
 import { wellFormedDeep } from "../lib/text";
 import { MIN_FOLLOWERS, MIN_SAMPLE_FOR_PRICING } from "../lib/ingest/pipeline";
@@ -115,6 +116,7 @@ export async function migrate(client?: PoolClient): Promise<void> {
   await runner.query(SCHEMA);
   await reconcileBookable(runner);
   await reconcileNiches(runner);
+  await reconcileBrandSafety(runner);
 }
 
 /**
@@ -170,6 +172,37 @@ async function reconcileNiches(runner: { query: Pool["query"] }): Promise<void> 
   }
 
   if (repaired > 0) console.log(`[db] repaired niche tags on ${repaired} stored creator(s)`);
+}
+
+/**
+ * Replaces stored brand-safety scores that nothing ever assessed.
+ *
+ * The pipeline used to write a flat 80 with an empty flag list, which the profile rendered as "No
+ * brand-safety concerns in recent content" — an all-clear about a named person that no code here
+ * had any basis for. That was fixed at ingestion, but only records written afterwards carried the
+ * honest value: 423 of 555 still asserted 80, because a record is only rewritten when the creator
+ * is re-ingested, and most never are.
+ *
+ * Nothing in this codebase watches a video or reads a comment thread, so the correct value is the
+ * same for every creator and this pass is a straight overwrite.
+ */
+async function reconcileBrandSafety(runner: { query: Pool["query"] }): Promise<void> {
+  const { rows } = await runner.query<{ id: string; record: SourcedCreator }>(
+    "select id, record from creators where (record->'creator'->'brandSafety'->>'score')::int <> 0",
+  );
+  if (rows.length === 0) return;
+
+  for (const row of rows) {
+    const record: SourcedCreator = {
+      ...row.record,
+      creator: {
+        ...row.record.creator,
+        brandSafety: { score: 0, flags: [BRAND_SAFETY_NOT_ASSESSED] },
+      },
+    };
+    await runner.query("update creators set record = $2 where id = $1", [row.id, JSON.stringify(wellFormedDeep(record))]);
+  }
+  console.log(`[db] cleared ${rows.length} fabricated brand-safety score(s)`);
 }
 
 const UPSERT = `insert into creators (
